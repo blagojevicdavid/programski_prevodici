@@ -22,3 +22,57 @@ case
     else 'visoka'
     end as kategorija
 from predstava p join repertoar r on p.idpr = r.pre;
+
+4.(1.5) Prikazati sve predstave (IDPR, NAZPR) i nazive scena na kojima se one izvode. Za svako izvo?enje prikazati i kategoriju cene karte.
+Cene do 1500 dinara pripadaju kategoriji „niska“, cene od 1500 do 2000 dinara pripadaju kategoriji „srednja“, dok cene preko 2000 dinara
+pripadaju kategoriji „visoka“.
+
+select p.nazpr, po.nazpz, r.brmes
+from predstava p join repertoar r on p.idpr = r.pre
+join pozoriste po on po.idpz = r.poz
+where r.cenakrt = (select max(cenakrt) from repertoar);   
+5.(1.5) Prikazati naziv predstave, naziv pozorišta koje izvodi predstavu i broj slobodnih mesta za predstavu sa najve?om cenom karte.
+
+select distinct po.nazpz, g.nazg
+from pozoriste po join grad g on po.gradp = g.idg join repertoar r on po.idpz = r.poz
+where po.idpz in (select r.poz from repertoar r where r.scena = 'Jovan Djordjevic')
+and po.idpz in (select r.poz from repertoar r where r.scena = 'Kamerna Scena')
+and po.idpz not in (select r.poz from repertoar r where r.scena = 'Pera Dobrinovic')
+order by po.nazpz desc;
+6.(1.5) Prikazati nazive pozorišta i nazive gradova u kojima se nalaze pozorišta koja izvode predstave na scenama „Jovan ?or?evi?“
+i „Kamema Scena“, a ne izvode predstave na sceni „Pera Dobrinovi?“. Rezultat sortirati u opadaju?em redosledu naziva pozorišta.
+--kad tekst kaze imaju x i y onda in ili exist
+
+update grad
+set oznaka = substr(nazg,1 ,3) || '...';
+--da imamo lower ime grada bilo bi ovako
+--update grad 
+--set nazg = LOWER(nazg)
+7.(1.5) U tabeli Grad promeniti kolonu OZNAKA tako da sadrži prva tri slova naziva grada i „…“ (npr. za Beograd „Beo…“).
+
+select po.idpz, po.nazpz, g.nazg, count(r.pre) as broj_predstava
+from pozoriste po left join repertoar r on po.idpz = r.poz join grad g on g.idg = po.gradp 
+group by po.idpz, po.nazpz, g.nazg
+having count(r.pre) < 3;
+8.(1.5) Prikazati šifru, naziv pozorišta, naziv grada u kojem se nalazi pozorište i broj predstava tog pozorišta.
+Ako pozorište nema predstavu na repertoaru za broj predstava postaviti 0 (nula). Prikazati samo pozorišta koja imaju manje od 3 predstave na repertoaru.
+
+create view Pogled_pozoriste_Cene as
+select po.idpz, po.nazpz, nvl(min(r.cenakrt), 0) as min_cena, nvl(max(r.cenakrt), 0) as max_cena
+from pozoriste po left join repertoar r on po.idpz = r.poz
+group by po.idpz, po.nazpz;
+9.(2) Kreirati pogled Pogled_Pozoriste_Cene koji ?e za svako pozorište (IDPZ, NAZPZ) prikazati minimalnu i
+maksimalnu cenu karte. Ako pozorište nema predstavu na repertoaru, za minimalnu i maksimalnu cenu karte postaviti 0 (nula).
+
+SELECT p.idpr, p.nazpr, r.cenakrt, r.brmes,
+       ROUND(r.cenakrt - (SELECT AVG(r2.cenakrt) FROM repertoar r2 WHERE r2.poz = r.poz), 3 ) AS razlika
+FROM predstava p
+JOIN repertoar r ON p.idpr = r.pre
+JOIN pozoriste po ON po.idpz = r.poz
+WHERE r.cenakrt > (SELECT AVG(r2.cenakrt) FROM repertoar r2 WHERE r2.poz = r.poz)
+ORDER BY r.brmes ASC;
+10.(3) Prikazati sve predstave (IDPR, NAZPR), cenu karte, broj slobodnih mesta i razliku izme?u
+cene karte te predstave i prose?ne cene karte za predstave pozorišta koje izvodi tu predstavu,
+zaokruženu na 3 decimalna mesta. Prikazati samo predstave ?ija je cena ve?a od prose?ne cene karte
+za predstave pozorišta koje izvodi tu predstavu. Rezultat sortirati u rastu?em redosledu broja slobodnih mesta.
+

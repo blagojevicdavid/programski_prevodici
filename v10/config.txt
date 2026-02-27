@@ -1,1 +1,24 @@
-proba
+select idpr, nazpr
+from predstava
+order by nazpr asc;
+
+1.Prikazati predstave (IDPR, NAZPR), sortirane u rastu?em redosledu naziva predstave.
+
+select idpz, nazpz
+from pozoriste
+where nazpz like '%e';
+
+2.(0.75) Prikazati pozorišta (IDPZ, NAZPZ) ?iji se nazivi završavaju na malo slovo „e“.
+
+alter table grad
+drop column ZIPKOD;
+
+3.(1) U tabeli Grad obrisati kolonu ZIPKOD koja predstavlja poštanski broj grada.
+
+select p.idpr, p.nazpr, r.scena,
+case
+    when r.cenakrt <= 1500 then 'Niska'
+    when r.cenakrt <= 2000 then 'Srednja'
+    else 'visoka'
+    end as kategorija
+from predstava p join repertoar r on p.idpr = r.pre;

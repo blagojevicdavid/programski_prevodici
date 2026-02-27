@@ -1,31 +1,304 @@
-//svi imate isto, prilagodite malo
+#include <stdio.h>
+#include <stdlib.h>
+#include<string.h>
+#include<io.h>
 
-//1
-SELECT idn, ulica, ul_br FROM nepokretnost WHERE opstina = 'Petrovaradin' ORDER BY kvd ASC;
+#define F 4
+#define endOfFile "***********"
+typedef enum {ACTIVE, RETURNED}StatusPozajmice;
 
-//2
-SELECT idn, kvd, ulica, ul_br FROM nepokretnost WHERE kvd BETWEEN 50 AND 100;
+typedef struct Date {
+	int dan;
+	int mesec;
+	int godina;
+} VREME;
 
-//3
-ALTER TABLE nepokretnost ADD (datpocizg date, datzavizg date);
+typedef struct Slog {
+	int sifraParkiranja;
+	char regOznaka[10];
+	char datumParkiranja[11];
+	VREME datum;
+	int duzinaBoravkaMin;
+	int oznakaParkingMesta;
+	char parkingZona[11];
+	int deleted;
+} SLOG;
 
-//4
-SELECT l.idl, l.imel, l.przl, pk.saldo, CASE WHEN pk.saldo >= 0 THEN 'Nezaduzena' WHEN pk.saldo >= -15000 AND pk.saldo < 0 THEN 'Umereno zaduzena' ELSE 'Zaduzena' END AS kategorija FROM lice l, poreskakartica pk WHERE l.idl = pk.idl;
+typedef struct Blok {
+	SLOG slogovi[FBLOKIRANJA];
+} BLOK;
 
-//5
-SELECT pk.idk, l.imel, l.przl, n.kvd, n.ulica, vn.nazivvn FROM poreskakartica pk, lice l, nepokretnost n, vrstanep vn WHERE pk.idl = l.idl AND n.idl = l.idl AND n.idvn = vn.idvn AND l.vrstal = 'PRAVNO' AND pk.dug > 0;
+int formiranje(char* naziv);
+void ispis_jednog_sloga(SLOG slog);
+int ispis(FILE* sekvDat);
+void prikaz_godine(FILE* fajl, int godina);
+void ispis_zona(FILE* fajl)
+int dodaj(FILE* fajl, SLOG noviSlog);
+int ucitaj(FILE* txt, FILE* sekvencijalna);
+int logicko_brisanje(FILE* fajl);
+void ispis_zona(FILE* fajl);
 
-//6
-SELECT l.idl, l.imel, l.przl FROM lice l WHERE l.idl IN (SELECT n.idl FROM nepokretnost n, vrstanep vn WHERE n.idvn = vn.idvn AND vn.nazivvn = 'Stan') AND l.idl NOT IN (SELECT n.idl FROM nepokretnost n, vrstanep vn WHERE n.idvn = vn.idvn AND vn.nazivvn = 'Kuca');
+int main()
+{
+    int status = formiranje("parking.dat");
+    FILE* fajl = fopen("parking.dat", "rb+");
+    FILE* txt = fopen("parking.txt", "r");
 
-//7
-SELECT  n.idn, n.kvd, n.ulica, n.ul_br AS broj, v.idvn, v.nazivvn FROM nepokretnost n JOIN vrstanep v ON v.idvn = n.idvn WHERE n.kvd < (SELECT AVG(n2.kvd) FROM nepokretnost n2 WHERE n2.idvn = n.idvn);
+    ucitaj(txt, fajl);
+    ispis(fajl);
 
-//8
-UPDATE poreskakartica SET kamata = kamata * 1.05 WHERE dug > 0;
+    int g;
+    printf("\nUnesite godinu : ");
+    scanf("%d", &g);
+    prikaz_godine(fajl, g);
 
-//9
-SELECT l.imel, l.przl, COUNT(n.idn) AS broj_nepokretnosti, COUNT(DISTINCT n.idvn)  AS broj_razlicitih_vrsta, SUM(n.kvd) AS ukupna_kvadratura, pk.saldo FROM lice l JOIN poreskakartica pk ON pk.idl = l.idl JOIN nepokretnost n ON n.idl = l.idl GROUP BY l.imel, l.przl, pk.saldo HAVING SUM(n.kvd) < 200;
+    logicko_brisanje(fajl);
+    ispis(fajl);
 
-//10 ?
-CREATE OR REPLACE VIEW dug_po_grupama AS SELECT grupa, SUM(dug) ukupan_dug FROM (SELECT CASE WHEN l.vrstal = 'FIZICKO' AND v.nazivvn = 'Kuca' THEN 'Fizicka lica - Kuca' WHEN l.vrstal = 'PRAVNO' AND v.nazivvn = 'Poslovni prostor' THEN 'Pravna lica - Poslovni prostor' WHEN l.vrstal = 'FIZICKO' AND n.idl IS NULL THEN 'Fizicka lica - Bez nepokretnosti' END AS grupa, pk.dug FROM lice l LEFT JOIN nepokretnost n ON l.idl = n.idl LEFT JOIN vrstanep v ON n.idvn = v.idvn LEFT JOIN poreskakartica pk ON l.idl = pk.idl) GROUP BY grupa; SELECT * FROM dug_po_grupama WHERE ukupan_dug > (SELECT AVG(dug) FROM poreskakartica);
+    ispis_zona(fajl);
+
+    fclose(txt);
+    fclose(fajl);
+    return 0;
+}
+
+int formiranje(char* naziv)
+{
+    FILE* sekvDat = fopen(naziv, "wb");
+    if(sekvDat != NULL)
+    {
+        BLOK blok;
+        strcpy(blok.slogovi[0].ID, endOfFile);
+        fwrite(&blok, sizeof(BLOK), 1, sekvDat);
+        fclose(sekvDat);
+        return 0;
+    }
+    else
+        return 2;
+}
+
+void ispis_jednog_sloga(SLOG slog)
+{
+    printf("----------\n");
+    printf("Sifra parkiranja : %d\n", slog.sifraParkiranja);
+    printf("REG : %s\n", slog.regOznaka);
+    printf("DATUM : %d-%d-%d\n", slog.datum.dan, slog.datum.mesec,slog.datum.godina);
+    printf("Duzina boravka : %d min\n", slog.duzinaBoravkaMin);
+    printf("Oznaka parking mesta : %d\n", slog.oznakaParkingMesta);
+    printf("Parking zona : %s\n", slog.parkingZona);
+    printf("Obrisan : %d\n", slog.deleted);
+    printf("----------\n");
+}
+
+int ispis(FILE* sekvDat)
+{
+    if(sekvDat == NULL)
+        return 2;
+    else
+    {
+        fseek(sekvDat, 0, SEEK_SET);
+        BLOK blok;
+        int rbb = 0;
+        int i;
+        while(fread(&blok, sizeof(BLOK), 1, sekvDat))
+        {
+            int i;
+            for(i = 0; i < F; i++)
+            {
+                if(strcmp(blok.slogovi[i].ID, endOfFile) != 0 && blok.slogovi[i].obrisan != 1)
+                {
+                    printf("RBB : %d, RBS : %d", rbb, i);
+                    ispis_jednog_sloga(blok.slogovi[i]);
+                }
+                else if(strcmp(blok.slogovi[i].ID, endOfFile) == 0)
+                {
+                    return 0;
+                }
+
+            }
+            rbb++;
+        }
+        return 0;
+    }
+}
+
+int dodaj(FILE* fajl, SLOG noviSlog)
+{
+    if(fajl == NULL)
+        return 2;
+    else
+    {
+        fseek(fajl, 0, SEEK_SET);
+        BLOK blok;
+        int rbb = 0;
+        while(fread(&blok, sizeof(BLOK), 1, fajl))
+        {
+            int i;
+            for(i = 0; i < F; i++)
+            {
+                if(strcmp(blok.slogovi[i].ID, endOfFile) == 0)
+                {
+                    blok.slogovi[i] = noviSlog;
+                    if(i != F - 1)
+                    {
+                        strcpy(blok.slogovi[i+1].ID, endOfFile);
+                        fseek(fajl, -sizeof(BLOK), SEEK_CUR);
+                        fwrite(&blok, sizeof(BLOK), 1, fajl);
+                        return 0;
+                    }
+                    else{
+                        fseek(fajl, -sizeof(BLOK), SEEK_CUR);
+                        fwrite(&blok, sizeof(BLOK), 1, fajl);
+                        BLOK noviBlok;
+                        strcpy(noviBlok.slogovi[0].ID, endOfFile);
+                        fwrite(&noviBlok, sizeof(BLOK), 1, fajl);
+                        return 0;
+                    }
+                }
+                else if(strcmp(blok.slogovi[i].ID, noviSlog.ID) == 0)
+                {
+                    if(blok.slogovi[i].obrisan == 1)
+                    {
+                        blok.slogovi[i] = noviSlog;
+                        fseek(fajl, -sizeof(BLOK), SEEK_CUR);
+                        fwrite(&blok, sizeof(BLOK), 1, fajl);
+                        return 0;
+                    }else
+                        return 2;
+                }
+                else if(strcmp(blok.slogovi[i].ID, noviSlog.ID) > 0)
+                {
+                    SLOG tempSlog;
+                    tempSlog = blok.slogovi[i];
+                    blok.slogovi[i] = noviSlog;
+                    noviSlog = tempSlog;
+                    if(i == F - 1)
+                    {
+                        fseek(fajl, -sizeof(BLOK), SEEK_CUR);
+                        fwrite(&blok, sizeof(BLOK), 1, fajl);
+                        fseek(fajl, 0, SEEK_CUR);
+                    }
+                }
+            }
+        }
+    }
+}
+
+int ucitaj(FILE* txt, FILE* sekvencijalna)
+{
+    SLOG s;
+    while(fscanf("%d %s %d-%d-%d %d %d %s %d",  &s.sifraParkiranja,
+                                                s.regOznaka,
+                                                &s.datum.dan,
+                                                &s.datum.mesec,
+                                                &s.datum.godina,
+                                                &s.duzinaBoravkaMin,
+                                                &s.oznakaParkingMesta,
+                                                s.parkingZona,
+                                                &s.deleted) != EOF)
+    {
+        dodaj(sekvencijalna, s);
+    }
+}
+
+int logicko_brisanje(FILE* fajl)
+{
+    if(fajl == NULL)
+        return 1;
+    else
+    {
+        fseek(fajl, 0, SEEK_SET);
+        BLOK blok;
+        int rbb = 0;
+        while(fread(&blok, sizeof(BLOK), 1, fajl))
+        {
+            int i;
+            for(i = 0; i < F; i++)
+            {
+                if(blok.slogovi[i].sifraParkiranja == -1)
+                    return 0;
+                if(blok.slogovi[i].duzinaBoravkaMin < 30 && blok.slogovi[i].deleted == 0)
+                {
+                    blok.slogovi[i].deleted = 1;
+                    rbb--;
+                    fseek(fajl, -sizeof(BLOK), SEEK_CUR);
+                    fwrite(&blok, sizeof(BLOK), 1, fajl);
+                    fseek(fajl, 0, SEEK_CUR);
+                }
+            }
+            rbb++;
+        }
+    }
+}
+
+void prikaz_godine(FILE* fajl, int godina)
+{
+    if(fajl == NULL)
+        return 1;
+    else
+    {
+        fseek(fajl, 0, SEEK_SET);
+        BLOK blok;
+        int rbb = 0;
+        while(fread(&blok, sizeof(BLOK), 1, fajl))
+        {
+            int i;
+            for(i = 0; i < F; i++)
+            {
+                if(blok.slogovi[i].sifraParkiranja == -1)
+                    return 0;
+                if(blok.slogovi[i].datum.godina == godina)
+                {
+                    ispis_jednog_sloga(blok.slogovi[i]);
+                }
+            }
+        }
+    }
+}
+
+void ispis_zona(FILE* fajl)
+{
+    if(fajl == NULL)
+        return 1;
+    else
+    {
+        int brojacBelih = 0, brojacCrvenih = 0, brojacPlavih = 0;
+        double srvrB = 0.0, srvrC = 0.0, srvrP = 0.0
+
+        fseek(fajl, 0, SEEK_SET);
+        BLOK blok;
+        int rbb = 0;
+        while(fread(&blok, sizeof(BLOK), 1, fajl))
+        {
+            int i;
+            for(i = 0; i < F; i++)
+            {
+                if(blok.slogovi[i].sifraParkiranja == -1)
+                    return 0;
+                if(strcmp(blok.slogovi[i].parkingZona, "plava") == 0)
+                {
+                    srvrP += blok.slogovi[i].duzinaBoravkaMin;
+                    brojacPlavih++;
+                }
+                else if(strcmp(blok.slogovi[i].parkingZona, "crvena") == 0)
+                {
+                    srvrC += blok.slogovi[i].duzinaBoravkaMin;
+                    brojacCrvenih++;
+                }
+                else if(strcmp(blok.slogovi[i].parkingZona, "bela") == 0)
+                {
+                    srvrB += blok.slogovi[i].duzinaBoravkaMin;
+                    brojacBelih++;
+                }
+            }
+        }
+
+        srvrB /= (double)brojacBelih;
+        srvrC /= (double)brojacCrvenih;
+        srvrP /= (double)brojacPlavih;
+
+        printf("Prosecan broj minuta u plavoj zoni : %.2lf", srvrP);
+        printf("Prosecan broj minuta u crvenoj zoni : %.2lf", srvrC);
+        printf("Prosecan broj minuta u beloj zoni : %.2lf", srvrB);
+    }
+}

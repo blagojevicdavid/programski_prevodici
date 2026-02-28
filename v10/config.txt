@@ -1,88 +1,70 @@
-/* Novi tokeni */
-%token _PETLJAJ
-%token _UOPSEGUOD
+//dodajes u .l fajl medju tokene
+"iteriraj"      { return _ITERIRAJ; }
+"korak"         { return _KORAK; }
+"do"			{ return _DO; }
+
+//dodajes u .z fajl medju ostale tokene
+%token _ITERIRAJ
+%token _KORAK
 %token _DO
-%token _PREKID
-%token _DVOTACKA
 
+ //u .y nadji pojam statement i dodaj kao jednu od opcija
+  | iteriraj_statement
 
-/* Proširenje statement-a */
-statement
-  : ...
-  | petljaj_statement
-  ;
+//pravis svoj novi pojam iz zad
+//ovo pises bilo gdje ali najbolje odmah ispod statementa
 
-/* Petljaj iskaz */
-petljaj_statement
-  : _PETLJAJ _ID
-  {
-    int idx = lookup_symbol($2, (VAR|PAR));
-    if(idx == -1)
-      err("'%s' nedeklarisano", $2);
-  }
-  _UOPSEGUOD literal
-  {
-    int idx = lookup_symbol($2, (VAR|PAR));
-    if(get_type(idx) != get_type($5))
-      err("id i lit1 moraju biti istog tipa");
-
-    gen_mov($5, idx);
-    $<i>$ = ++lab_num;
-    code("\n@petljaj%d:", $<i>$);
-  }
-
-  _DO literal
-  {
-    int idx = lookup_symbol($2, (VAR|PAR));
-    if(get_type($5) != get_type($8))
-      err("lit1 i lit2 moraju biti istog tipa");
-
-    gen_cmp(idx, $8);
-
-    if(atoi(get_name($5)) > atoi(get_name($8)))
+iteriraj_statement
+ :  _ITERIRAJ _ID 
+   {
+		int idx = lookup_symbol($2, (VAR|PAR));
+		if(idx == -1)
+		err("'%s' nije deklarisano", $2);
+		
+		code("\n\t\tMOV \t $1 ,");
+		gen_sym_name(idx);
+		
+		$<i>$ = ++lab_num;
+		code("\n@iteriraj%d: ", lab_num);
+   }
+   _KORAK literal
+   {
+      int idx = lookup_symbol($2, (VAR|PAR));
+      if(get_type(idx) != get_type($5))
+      err("ID i K moraju biti istog tipa");
+	  	  
+   }
+   _DO literal
     {
-      if(get_type(idx) == INT)
-        code("\n\t\tJLTS\t@petljaj_exit%d", $<i>6);
-      else
-        code("\n\t\tJLTU\t@petljaj_exit%d", $<i>6);
-    }
-    else
-    {
-      if(get_type(idx) == INT)
-        code("\n\t\tJGTS\t@petljaj_exit%d", $<i>6);
-      else
-        code("\n\t\tJGTU\t@petljaj_exit%d", $<i>6);
-    }
-  }
-
-  _DVOTACKA statement
-  {
-    int idx = lookup_symbol($2, (VAR|PAR));
-
-    if(atoi(get_name($5)) > atoi(get_name($8)))
-    {
-      if(get_type(idx) == INT)
-        code("\n\t\tSUBS\t");
-      else
-        code("\n\t\tSUBU\t");
-
-      gen_sym_name(idx);
-      code(", $1, ");
-      gen_sym_name(idx);
-    }
-    else
-    {
-      if(get_type(idx) == INT)
-        code("\n\t\tADDS\t");
-      else
-        code("\n\t\tADDU\t");
-
-      gen_sym_name(idx);
-      code(", $1, ");
-      gen_sym_name(idx);
-    }
-
-    code("\n\t\tJMP\t@petljaj%d", $<i>6);
-    code("\n@petljaj_exit%d:", $<i>6);
-  }
-  ;
+	  int idx = lookup_symbol($2, (VAR|PAR));
+     if(get_type($5) != get_type($8))
+      err("ID i MAX moraju biti istog tipa");
+	  if(get_type($5)  != get_type($8));
+	   err("K i MAX moraju biti istog tipa");
+	   
+	   int idx = lookup_symbol($2, (VAR|PAR));
+	   gen_cmp(i, $8);
+	   
+	   if(get_type(idx)==INT)
+	     code("\n\t\tJGTS \t");
+	   else code("\n\t\tJGTU \t");
+	   
+	   code("@iterate_kraj%d", $<i>3);
+	   
+	}
+	statement
+	{
+	 int idx = lookup_symbol($2, (VAR|PAR));
+	  if(get_type(idx)==INT)
+	     code("\n\t\tADDS \t");
+	   else code("\n\t\tADDU \t");
+	   
+	   gen_sym_name(idx);
+	   code(",");
+	   gen_sym_name($5);
+	   code(",");
+	    gen_sym_name(idx);
+	   
+	   code("\n\t\tJMP\t @iteriraj%d", $<i>3);
+	}
+ ;

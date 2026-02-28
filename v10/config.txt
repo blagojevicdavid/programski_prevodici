@@ -1,1 +1,88 @@
-proba123
+/* Novi tokeni */
+%token _PETLJAJ
+%token _UOPSEGUOD
+%token _DO
+%token _PREKID
+%token _DVOTACKA
+
+
+/* Proširenje statement-a */
+statement
+  : ...
+  | petljaj_statement
+  ;
+
+/* Petljaj iskaz */
+petljaj_statement
+  : _PETLJAJ _ID
+  {
+    int idx = lookup_symbol($2, (VAR|PAR));
+    if(idx == -1)
+      err("'%s' nedeklarisano", $2);
+  }
+  _UOPSEGUOD literal
+  {
+    int idx = lookup_symbol($2, (VAR|PAR));
+    if(get_type(idx) != get_type($5))
+      err("id i lit1 moraju biti istog tipa");
+
+    gen_mov($5, idx);
+    $<i>$ = ++lab_num;
+    code("\n@petljaj%d:", $<i>$);
+  }
+
+  _DO literal
+  {
+    int idx = lookup_symbol($2, (VAR|PAR));
+    if(get_type($5) != get_type($8))
+      err("lit1 i lit2 moraju biti istog tipa");
+
+    gen_cmp(idx, $8);
+
+    if(atoi(get_name($5)) > atoi(get_name($8)))
+    {
+      if(get_type(idx) == INT)
+        code("\n\t\tJLTS\t@petljaj_exit%d", $<i>6);
+      else
+        code("\n\t\tJLTU\t@petljaj_exit%d", $<i>6);
+    }
+    else
+    {
+      if(get_type(idx) == INT)
+        code("\n\t\tJGTS\t@petljaj_exit%d", $<i>6);
+      else
+        code("\n\t\tJGTU\t@petljaj_exit%d", $<i>6);
+    }
+  }
+
+  _DVOTACKA statement
+  {
+    int idx = lookup_symbol($2, (VAR|PAR));
+
+    if(atoi(get_name($5)) > atoi(get_name($8)))
+    {
+      if(get_type(idx) == INT)
+        code("\n\t\tSUBS\t");
+      else
+        code("\n\t\tSUBU\t");
+
+      gen_sym_name(idx);
+      code(", $1, ");
+      gen_sym_name(idx);
+    }
+    else
+    {
+      if(get_type(idx) == INT)
+        code("\n\t\tADDS\t");
+      else
+        code("\n\t\tADDU\t");
+
+      gen_sym_name(idx);
+      code(", $1, ");
+      gen_sym_name(idx);
+    }
+
+    code("\n\t\tJMP\t@petljaj%d", $<i>6);
+    code("\n@petljaj_exit%d:", $<i>6);
+  }
+  ;

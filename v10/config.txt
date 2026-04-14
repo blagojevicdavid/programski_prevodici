@@ -126,3 +126,33 @@
    {
        SendResponse(resource, socket, sw);
    }
+
+
+private static string GetStanoviTable(string filter)
+{
+    string result = "<table border='1'>" +
+                    "<tr><th>Id</th><th>Kvadratura</th><th>Sobnost</th><th>Cena</th><th>Ima balkon?</th></tr>";
+
+    List<Stan> lista = new List<Stan>();
+    foreach (Stan s in stanovi)
+    {
+        if (String.IsNullOrEmpty(filter) || s.Sobnost.Equals(filter))
+            lista.Add(s);
+    }
+
+    if (lista.Count == 0)
+    {
+        result += "<tr><td colspan='5'>Lista je prazna!</td></tr>";
+    }
+    else
+    {
+        foreach (Stan s in lista)
+        {
+            result += $"<tr><td>{s.Id}</td><td>{s.Kvadratura}</td><td>{s.Sobnost}</td>" +
+                      $"<td>{s.Cena}</td><td>{(s.Balkon ? "Da" : "Ne")}</td></tr>";
+        }
+    }
+
+    result += "</table>";
+    return result;
+}

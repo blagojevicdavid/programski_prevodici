@@ -1,70 +1,189 @@
-//dodajes u .l fajl medju tokene
-"iteriraj"      { return _ITERIRAJ; }
-"korak"         { return _KORAK; }
-"do"			{ return _DO; }
+// HttpProtokol -- sablon | .NET 4.x C# | port 8080 | 127.0.0.1
+// Svaki server ima: Main() -> StartListening() -> Run() -> pomocne metode
 
-//dodajes u .z fajl medju ostale tokene
-%token _ITERIRAJ
-%token _KORAK
-%token _DO
+// ================================================================
+// StartListening() -- isti u svim serverima
+// ================================================================
+public static void StartListening() {
+    IPAddress ipAddress = IPAddress.Loopback;
+    IPEndPoint localEndPoint = new IPEndPoint(ipAddress, 8080);
+    Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+    serverSocket.Bind(localEndPoint);
+    serverSocket.Listen(10);
+    while (true) {
+        Socket socket = serverSocket.Accept();
+        Task t = Task.Factory.StartNew(() => Run(socket));
+        // BrojKlijenata: Task<int> t = Task.Factory.StartNew(() => Run(socket, ++clientCount));
+    }
+}
 
- //u .y nadji pojam statement i dodaj kao jednu od opcija
-  | iteriraj_statement
+// ================================================================
+// Run() -- prima socket, cita zahtev, salje odgovor, zatvara
+// ================================================================
+private static void Run(Socket socket) {
+    NetworkStream stream = new NetworkStream(socket);
+    StreamReader sr = new StreamReader(stream);
+    StreamWriter sw = new StreamWriter(stream) { NewLine = "\r\n", AutoFlush = true };
 
-//pravis svoj novi pojam iz zad
-//ovo pises bilo gdje ali najbolje odmah ispod statementa
+    string line = sr.ReadLine();
+    if (line == null) { /* zatvori i return */ }
 
-iteriraj_statement
- :  _ITERIRAJ _ID 
-   {
-		int idx = lookup_symbol($2, (VAR|PAR));
-		if(idx == -1)
-		err("'%s' nije deklarisano", $2);
-		
-		code("\n\t\tMOV \t $1 ,");
-		gen_sym_name(idx);
-		
-		$<i>$ = ++lab_num;
-		code("\n@iteriraj%d: ", lab_num);
-   }
-   _KORAK literal
-   {
-      int idx = lookup_symbol($2, (VAR|PAR));
-      if(get_type(idx) != get_type($5))
-      err("ID i K moraju biti istog tipa");
-	  	  
-   }
-   _DO literal
-    {
-	  int idx = lookup_symbol($2, (VAR|PAR));
-     if(get_type($5) != get_type($8))
-      err("ID i MAX moraju biti istog tipa");
-	  if(get_type($5)  != get_type($8));
-	   err("K i MAX moraju biti istog tipa");
-	   
-	   int idx = lookup_symbol($2, (VAR|PAR));
-	   gen_cmp(i, $8);
-	   
-	   if(get_type(idx)==INT)
-	     code("\n\t\tJGTS \t");
-	   else code("\n\t\tJGTU \t");
-	   
-	   code("@iterate_kraj%d", $<i>3);
-	   
-	}
-	statement
-	{
-	 int idx = lookup_symbol($2, (VAR|PAR));
-	  if(get_type(idx)==INT)
-	     code("\n\t\tADDS \t");
-	   else code("\n\t\tADDU \t");
-	   
-	   gen_sym_name(idx);
-	   code(",");
-	   gen_sym_name($5);
-	   code(",");
-	    gen_sym_name(idx);
-	   
-	   code("\n\t\tJMP\t @iteriraj%d", $<i>3);
-	}
- ;
+    // BrojKlijenata: citanje celog headera do prazne linije, zatim BrowserResponse()
+    while ((ln = sr.ReadLine()) != "") line += ln + "\n";
+
+    // ListanjeFoldera: parsiranje ?path= metodom Split, zatim BrowserResponse(sw, path)
+    // GET /dodaj?path=Temp HTTP/1.1
+    string path = "C:/";
+    string httpZahtev      = line.Split(' ')[1];       // /dodaj?path=Temp
+    string strArgumentsAll = httpZahtev.Split('?')[1]; // path=Temp
+    foreach (var arg in strArgumentsAll.Split('&'))
+        if (arg.Contains("path")) path += arg.Split('=')[1];
+
+    // ListanjeFolderaOverkill: isti rezultat, drugacije parsiranje
+    // GET /?path=C:/Windows HTTP/1.1
+    int idx = line.IndexOf("?path"), idxRazmak = line.LastIndexOf(" ");
+    string path = line.Substring(idx + 6, idxRazmak - idx - 6).Trim();
+
+    // RegistrationServer: razlikovanje browser vs custom klijent
+    string list = line.StartsWith("GET /") ? BrowserResponse(line) : ClientResponse(line);
+    sw.WriteLine(list);
+
+    // RegistrationServerOverkill: rutiranje /dodaj i /trazi
+    string filter = "";
+    if (line.Contains("/dodaj")) {
+        int idx1 = line.IndexOf("?usrname") + 9, idx2 = line.LastIndexOf(" ");
+        users.Add(line.Substring(idx1, idx2 - idx1));
+    } else if (line.Contains("/trazi")) {
+        int idx1 = line.IndexOf("?usrname") + 9, idx2 = line.LastIndexOf(" ");
+        filter = line.Substring(idx1, idx2 - idx1);
+    }
+    sw.WriteLine(line.StartsWith("GET /") ? BrowserResponse(filter) : ClientResponse(line));
+
+    // Httpd: parsiranje pa isporuka
+    string resource = GetResource(sr); // null ako nije GET
+    if (resource != null) {
+        if (resource.Contains("dodaj?usrname=")) { /* URL dekoduj i dodaj u listu */ }
+        else SendResponse(resource, socket, sw);
+    }
+
+    sr.Close(); sw.Close(); stream.Close();
+    socket.Shutdown(SocketShutdown.Both); socket.Close();
+}
+
+// ================================================================
+// BrowserResponse() -- gradi HTML i vraca string (ili salje direktno)
+// ================================================================
+
+// BrojKlijenata -- salje direktno preko sw
+private static void BrowserResponse(int value, StreamWriter sw) {
+    sw.WriteLine("HTTP/1.0 200 OK\r\nContent-Type: text/html;charset=UTF-8\r\n\r\n" +
+                 "<html><body><b>" + value + "</b></body></html>");
+}
+// ListanjeFoldera -- poziva ListFolder(), salje direktno
+private static void BrowserResponse(StreamWriter sw, string path) {
+    sw.WriteLine("HTTP/1.0 200 OK\r\nContent-Type: text/html;charset=UTF-8\r\n\r\n" +
+                 "<html><body>" + ListFolder(path) + "</body></html>");
+}
+// RegistrationServer/Overkill -- vraca string, filter="" prikazi sve
+private static string BrowserResponse(string filter) {
+    string list = "HTTP/1.1 200 OK\r\nContent-Type: text/html;charset=UTF-8\r\n\r\n<html><body><ol>\n";
+    foreach (string user in users)
+        if (user.Contains(filter)) list += "<li>" + user + "</li>\n";
+    return list + "</ol></body></html>\n";
+}
+
+// ================================================================
+// ClientResponse() -- za custom TCP klijent, plain text + END marker
+// ================================================================
+private static string ClientResponse(string line) {
+    users.Add(line);
+    string list = "";
+    foreach (string user in users) list += user + "\n";
+    return list + "END";
+}
+
+// ================================================================
+// ListFolder() -- vraca HTML string sa sadrzajem foldera
+// ================================================================
+private static string ListFolder(string path) {
+    DirectoryInfo d = new DirectoryInfo(path);
+    if (!d.Exists) return "Ne postoji: " + path;
+    string list = "";
+    // Overkill: navigacija ka parent folderu
+    if (!(path.Equals("C:/") || path.Equals("C:\\")))
+        list += "<a href=\"?path=" + d.Parent.FullName + "\">" +
+                "<img src=\"" + MakeImageSrcData("../../../folder48x48.png") + "\"/></a><br>\n";
+    // Overkill: folderi kao linkovi | obicna verzija: samo crveni tekst bez href
+    foreach (DirectoryInfo di in d.GetDirectories())
+        list += "<a href=\"?path=" + di.FullName + "\">&lt;" + di.Name + "&gt;</a><br>\n";
+    foreach (FileInfo fi in d.GetFiles())
+        list += fi.Name + "<br />\n";
+    return list;
+}
+
+// ================================================================
+// MakeImageSrcData() -- Overkill: ucitava sliku i vraca Base64 src
+// ================================================================
+// <img src="data:image/png;base64,[data]"> -- embed | <img src="url"> -- link
+private static string MakeImageSrcData(string filename) {
+    byte[] filebytes = File.ReadAllBytes(filename);
+    return "data:image/png;base64," + Convert.ToBase64String(filebytes);
+}
+
+// ================================================================
+// GetResource() -- Httpd: parsira request liniju, vraca ime resursa
+// ================================================================
+private static string GetResource(StreamReader sr) {
+    string line = sr.ReadLine();
+    if (line == null) return null;
+    String[] tokens = line.Split(' '); // ["GET", "/resurs", "HTTP/1.1"]
+    if (!tokens[0].Equals("GET")) return null;
+    string rsrc = tokens[1].Substring(1); // uklanjamo '/'
+    while (!(sr.ReadLine()).Equals("")) { } // ignorisemo ostatak headera
+    return rsrc;
+}
+
+// ================================================================
+// SendResponse() -- Httpd: salje datoteku ili 404
+// ================================================================
+private static void SendResponse(string resource, Socket socket, StreamWriter sw) {
+    FileInfo fi = new FileInfo("../../../" + resource); // web root
+    if (!fi.Exists) { sw.Write("HTTP/1.0 404 File not found\r\nContent-type: text/html\r\n\r\n<b>404</b>"); return; }
+    sw.Write("HTTP/1.0 200 OK\r\n\r\n");
+    socket.SendFile(fi.FullName); // zero-copy
+    // URL dekodovanje pre dodavanja u listu (u Run(), za /dodaj rutu):
+    // usrname = Uri.UnescapeDataString(usrname); // %20 -> razmak
+    // usrname = usrname.Replace("+", " ");
+}
+
+// ================================================================
+// RegistationClient -- StartClient() umesto StartListening()
+// ================================================================
+public static void StartClient(string[] args) {
+    Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+    socket.Connect(new IPEndPoint(IPAddress.Loopback, 8080));
+    // stream, sr, sw isto kao u serveru...
+    sw.WriteLine(args.Length != 0 ? args[0] : "pera");
+    string received = "";
+    while (!(line = sr.ReadLine()).Equals("END")) received += line + "\n";
+}
+
+// ================================================================
+// HTML forme i HTML5 elementi
+// ================================================================
+<form action="ciljna.html" method="get"> ... </form>   <!-- GET: parametri u URL-u -->
+<form action="ciljna.html" method="post"> ... </form>  <!-- POST: parametri u telu -->
+<form method="post" enctype="multipart/form-data"><input type="file" name="f"/></form>
+
+<input list="lista" name="marka"/>
+<datalist id="lista"><option value="Mercedes"><option value="Peugeot"></datalist>
+<input type="color" name="boja">
+<input type="date" name="datum" value="2010-08-14"/>
+<input type="text" name="polje" required autofocus>
+<form action="http://localhost:8080/dodaj"><input type="text" name="usrname"/><input type="submit"/></form>
+<form action="http://localhost:8080/trazi"><input type="text" name="usrname"/><input type="submit"/></form>
+
+// HTTP status linije:
+"HTTP/1.0 200 OK\r\nContent-Type: text/html;charset=UTF-8\r\n\r\n"  // HTML
+"HTTP/1.0 200 OK\r\n\r\n"                                            // datoteka (+ SendFile)
+"HTTP/1.0 404 File not found\r\nContent-type: text/html\r\n\r\n"    // greska

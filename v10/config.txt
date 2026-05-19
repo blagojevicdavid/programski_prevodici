@@ -428,3 +428,5 @@ namespace SOV2
         }
     }
 }
+
+Nakon ovoga Build → Rebuild Solution i sve 4 greske ce nestati. Posto njegov template nema bundles/filters konfiguraciju, te linije nisu ni potrebne za rad zadatka.

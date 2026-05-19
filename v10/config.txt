@@ -1,1 +1,394 @@
-hghgjhs
+                    GRUPA 7B - ASP.NET MVC RESENJE
+              Aplikacija za evidenciju mobilnih telefona
+========
+
+UPUTSTVO:
+1. U Visual Studio kreiraj novi prazan ASP.NET Web Application (.NET Framework)
+   projekat sa MVC opcijom. Naziv projekta: Grupa7B
+   (File > New Project > ASP.NET Web Application (.NET Framework) > Empty + MVC)
+
+2. U projektu kreiraj sledecu strukturu fajlova i kopiraj sadrzaj ispod.
+
+3. NAPOMENA o namespace-u: Ako tvoj projekat ima drugaciji naziv,
+   zameni svuda "Grupa7B" sa nazivom tvog projekta.
+
+4. Pokreni projekat (F5) - otvara se Index stranica sa formom za unos.
+
+
+================
+STRUKTURA PROJEKTA (sta gde ide):
+================
+
+Grupa7B/
+├── Models/
+│   ├── MobilniTelefon.cs
+│   ├── Proizvodjac.cs           (enum)
+│   └── OperativniSistem.cs      (enum)
+├── Controllers/
+│   └── HomeController.cs
+├── Views/
+│   ├── _ViewStart.cshtml        (vec postoji - opciono prepravi)
+│   ├── Shared/
+│   │   └── _Layout.cshtml       (vec postoji - mozes ostaviti)
+│   └── Home/
+│       ├── Index.cshtml         (forma za unos)
+│       └── Spisak.cshtml        (tabela telefona)
+└── Global.asax.cs               (vec postoji - prepravi Application_Start)
+
+
+
+=============
+FAJL: Models/Proizvodjac.cs
+=============
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+
+namespace Grupa7B.Models
+{
+    public enum Proizvodjac
+    {
+        Apple,
+        Samsung,
+        Xiaomi
+    }
+}
+
+
+
+==================
+FAJL: Models/OperativniSistem.cs
+==================
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+
+namespace Grupa7B.Models
+{
+    public enum OperativniSistem
+    {
+        iOS,
+        Android
+    }
+}
+
+
+
+=================
+FAJL: Models/MobilniTelefon.cs
+==============
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+
+namespace Grupa7B.Models
+{
+    public class MobilniTelefon
+    {
+        public string Id { get; set; }
+        public string Procesor { get; set; }
+        public string VelicinaBaterije { get; set; }
+        public Proizvodjac Proizvodjac { get; set; }
+        public OperativniSistem OperativniSistem { get; set; }
+
+        public MobilniTelefon() { }
+
+        public MobilniTelefon(string id, string procesor, string velicinaBaterije,
+                              Proizvodjac proizvodjac, OperativniSistem operativniSistem)
+        {
+            Id = id;
+            Procesor = procesor;
+            VelicinaBaterije = velicinaBaterije;
+            Proizvodjac = proizvodjac;
+            OperativniSistem = operativniSistem;
+        }
+    }
+}
+
+
+
+===============
+FAJL: Controllers/HomeController.cs
+==============
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+using System.Web.Mvc;
+using Grupa7B.Models;
+
+namespace Grupa7B.Controllers
+{
+    public class HomeController : Controller
+    {
+        // GET: Home - pocetna stranica sa formom za unos
+        public ActionResult Index()
+        {
+            return View();
+        }
+
+        // POST: Home/Dodaj - dodavanje novog mobilnog telefona
+        [HttpPost]
+        public ActionResult Dodaj(MobilniTelefon telefon)
+        {
+            List<MobilniTelefon> telefoni = (List<MobilniTelefon>)HttpContext.Application["telefoni"];
+
+            // Provera da li telefon sa tim Id-em vec postoji
+            MobilniTelefon postojeci = telefoni.Find(t => t.Id.Equals(telefon.Id));
+            if (postojeci != null)
+            {
+                ViewBag.Greska = "Mobilni telefon sa tim id-em vec postoji!";
+                return View("Index");
+            }
+
+            telefoni.Add(telefon);
+            HttpContext.Application["telefoni"] = telefoni;
+
+            return RedirectToAction("Spisak");
+        }
+
+        // GET: Home/Spisak - tabelarni prikaz svih telefona
+        public ActionResult Spisak()
+        {
+            List<MobilniTelefon> telefoni = (List<MobilniTelefon>)HttpContext.Application["telefoni"];
+            return View(telefoni);
+        }
+
+        // GET: Home/Filtriraj?proizvodjac=Apple - filtriranje po proizvodjacu
+        public ActionResult Filtriraj(string proizvodjac)
+        {
+            List<MobilniTelefon> telefoni = (List<MobilniTelefon>)HttpContext.Application["telefoni"];
+
+            if (string.IsNullOrEmpty(proizvodjac))
+            {
+                return View("Spisak", telefoni);
+            }
+
+            Proizvodjac odabrani = (Proizvodjac)Enum.Parse(typeof(Proizvodjac), proizvodjac);
+            List<MobilniTelefon> filtrirani = telefoni.FindAll(t => t.Proizvodjac == odabrani);
+
+            return View("Spisak", filtrirani);
+        }
+    }
+}
+
+
+
+===================
+FAJL: Views/Home/Index.cshtml
+===================
+@using Grupa7B.Models
+
+@{
+    ViewBag.Title = "Grupa 7B";
+}
+
+<h1 style="text-align:center;">Grupa 7B</h1>
+
+<p>
+    Kreirati ASP.NET MVC aplikaciju koja vodi evidenciju o mobilnim telefonima.
+    Kao klijentsku aplikaciju koristiti veb pretraživač (npr. Google Chrome).
+    Za svaki telefon se evidentiraju identifikator, procesor, velicina baterije,
+    proizvođač i operativni sistem. Operativni sistem može imati jednu od sledećih
+    vrednosti: <b>Android</b> i <b>iOS</b>. Proizvođač može imati jednu od
+    sledećih vrednosti: <b>Apple</b>, <b>Samsung</b> i <b>Xiaomi</b>. Klijent na
+    server šalje parametre iz forme za unos (Slika 1):
+</p>
+
+@if (ViewBag.Greska != null)
+{
+    <h2 style="color:red;">@ViewBag.Greska</h2>
+}
+
+<h2>Unos novog mobilnog telefona</h2>
+
+<form method="post" action="~/Home/Dodaj">
+    <table>
+        <tr>
+            <td>Id:</td>
+            <td><input type="text" name="Id" /></td>
+        </tr>
+        <tr>
+            <td>Procesor:</td>
+            <td><input type="text" name="Procesor" /></td>
+        </tr>
+        <tr>
+            <td>Velicina baterije:</td>
+            <td><input type="text" name="VelicinaBaterije" /></td>
+        </tr>
+        <tr>
+            <td>Proizvodjac:</td>
+            <td>
+                <select name="Proizvodjac">
+                    @foreach (var p in Enum.GetValues(typeof(Proizvodjac)))
+                    {
+                        <option value="@p">@p</option>
+                    }
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td>Operativni sistem:</td>
+            <td>
+                <select name="OperativniSistem">
+                    @foreach (var o in Enum.GetValues(typeof(OperativniSistem)))
+                    {
+                        <option value="@o">@o</option>
+                    }
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <input type="submit" value="Dodaj" />
+            </td>
+        </tr>
+    </table>
+</form>
+
+<hr />
+
+<h2>Filtriraj po proizvodjacu</h2>
+
+<form method="get" action="~/Home/Filtriraj">
+    <table>
+        <tr>
+            <td>Proizvodjac:</td>
+            <td>
+                <select name="proizvodjac">
+                    @foreach (var p in Enum.GetValues(typeof(Proizvodjac)))
+                    {
+                        <option value="@p">@p</option>
+                    }
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <input type="submit" value="Filtriraj" />
+            </td>
+        </tr>
+    </table>
+</form>
+
+
+
+========================
+FAJL: Views/Home/Spisak.cshtml
+=======================
+@using Grupa7B.Models
+@model IEnumerable<MobilniTelefon>
+
+@{
+    ViewBag.Title = "Spisak mobilnih telefona";
+}
+
+<table border="1" cellpadding="5" cellspacing="0">
+    <tr>
+        <th colspan="5" style="text-align:center;">Spisak mobilnih telefona</th>
+    </tr>
+    <tr>
+        <th>Id</th>
+        <th>Procesor</th>
+        <th>Velicina baterija</th>
+        <th>Proizvodjac</th>
+        <th>Operativni sistem</th>
+    </tr>
+    @foreach (var telefon in Model)
+    {
+        <tr>
+            <td>@telefon.Id</td>
+            <td>@telefon.Procesor</td>
+            <td>@telefon.VelicinaBaterije</td>
+            <td>@telefon.Proizvodjac</td>
+            <td>@telefon.OperativniSistem</td>
+        </tr>
+    }
+</table>
+
+<br />
+
+<a href="~/Home/Index">Nazad</a>
+
+
+
+======================
+FAJL: Global.asax.cs   (PREPRAVITI postojeci Application_Start)
+====================
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+using System.Web.Mvc;
+using System.Web.Optimization;
+using System.Web.Routing;
+using Grupa7B.Models;
+
+namespace Grupa7B
+{
+    public class MvcApplication : System.Web.HttpApplication
+    {
+        protected void Application_Start()
+        {
+            AreaRegistration.RegisterAllAreas();
+            FilterConfig.RegisterGlobalFilters(GlobalFilters.Filters);
+            RouteConfig.RegisterRoutes(RouteTable.Routes);
+            BundleConfig.RegisterBundles(BundleTable.Bundles);
+
+            // Inicijalna lista mobilnih telefona (test podaci sa Slike 2)
+            List<MobilniTelefon> telefoni = new List<MobilniTelefon>
+            {
+                new MobilniTelefon("1", "A15 Bionic", "2800 mAh",
+                                   Proizvodjac.Apple, OperativniSistem.iOS),
+                new MobilniTelefon("2", "Snapdragon 845", "3500 mAh",
+                                   Proizvodjac.Samsung, OperativniSistem.Android),
+                new MobilniTelefon("3", "Snapdragon 865", "4500 mAh",
+                                   Proizvodjac.Xiaomi, OperativniSistem.Android)
+            };
+
+            HttpContext.Current.Application["telefoni"] = telefoni;
+        }
+    }
+}
+
+
+
+================================================================================
+NAPOMENE:
+================================================================================
+
+1. Default ruta (App_Start/RouteConfig.cs) - NE diraj, ostavi default.
+   Default je { controller = "Home", action = "Index" } sto je tacno ono
+   sto nam treba (otvara Index.cshtml na pocetnoj).
+
+2. Layout - mozes ostaviti default _Layout.cshtml ili obrisati liniju u
+   _ViewStart.cshtml ako zelis ciste stranice. Test za zadatak je da
+   funkcionalnost radi.
+
+3. Test podaci (A15 Bionic / Snapdragon 845 / Snapdragon 865) ucitavaju se
+   automatski pri pokretanju aplikacije iz Global.asax.cs - tako da kad
+   kliknes "Dodaj" prvi put i odes na spisak vec ces videti 3 telefona.
+
+4. Tok aplikacije:
+   - Otvara se Index.cshtml (forma za unos + filter)
+   - Klik na "Dodaj" -> POST na /Home/Dodaj
+     * Ako Id postoji -> ostaje na Index sa porukom (Slika 3)
+     * Ako Id ne postoji -> RedirectToAction na Spisak (Slika 2)
+   - Klik na "Filtriraj" -> GET na /Home/Filtriraj?proizvodjac=X
+     * Vraca View "Spisak" sa filtriranom listom (Slika 4)
+   - Klik na "Nazad" na spisku -> vraca na Index.cshtml
+
+5. Validacija - tekst poruke "Mobilni telefon sa tim id-em vec postoji!"
+   je tacno onako kako je trazeno na Slici 3.
+
+6. Sva polja se salju kao stringovi/enumi - automatic model binding ce
+   da popuni MobilniTelefon objekat.
+
+
+
+================================================================================
+KRAJ FAJLA
+================================================================================

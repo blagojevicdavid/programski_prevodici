@@ -1,432 +1,257 @@
-UPUTSTVO:
-1. U Visual Studio kreiraj novi prazan ASP.NET Web Application (.NET Framework)
-   projekat sa MVC opcijom. Naziv projekta: SOV2
-   (File > New Project > ASP.NET Web Application (.NET Framework) > Empty + MVC)
+Common//
 
-2. U projektu kreiraj sledecu strukturu fajlova i kopiraj sadrzaj ispod.
-
-3. NAPOMENA o namespace-u: Ako tvoj projekat ima drugaciji naziv,
-   zameni svuda "SOV2" sa nazivom tvog projekta.
-
-4. Pokreni projekat (F5) - otvara se Index stranica sa formom za unos.
-
-
-===================================
-STRUKTURA PROJEKTA (sta gde ide):
-=========================
-
-SOV2/
-├── Models/
-│   ├── MobilniTelefon.cs
-│   ├── Proizvodjac.cs           (enum)
-│   └── OperativniSistem.cs      (enum)
-├── Controllers/
-│   └── HomeController.cs
-├── Views/
-│   ├── _ViewStart.cshtml        (vec postoji - opciono prepravi)
-│   ├── Shared/
-│   │   └── _Layout.cshtml       (vec postoji - mozes ostaviti)
-│   └── Home/
-│       ├── Index.cshtml         (forma za unos)
-│       └── Spisak.cshtml        (tabela telefona)
-└── Global.asax.cs               (vec postoji - prepravi Application_Start)
-
-
-
-========================
-FAJL: Models/Proizvodjac.cs
-=====================
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Web;
-
-namespace SOV2.Models
+IStudentService/
+namespace Common{
+[ServiceContract]
+public interface IStudentService
 {
-    public enum Proizvodjac
+
+    [OperationContract]
+    [FaultContract(typeof(StudentNotFoundException))]
+    string GetStudentInfo(string indeks);
+}
+}
+StudentNotFound/
+[DataContract]
+public class StudentNotFoundException
+{
+    [DataMember]
+    public string Message { get; set; }
+
+    public StudentNotFoundException(string message)
     {
-        Apple,
-        Samsung,
-        Xiaomi
+        Message = message;
     }
 }
 
-
-
-=====================
-FAJL: Models/OperativniSistem.cs
-====================
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Web;
-
-namespace SOV2.Models
+Service//
+Program/
+static void Main(string[] args)
 {
-    public enum OperativniSistem
+    using (ServiceHost host = new ServiceHost(typeof(StudentService)))
     {
-        iOS,
-        Android
+        host.Open();
+        Console.WriteLine("Service is open, press any key to close it.");
+        Console.ReadKey();
+        host.Close();
     }
+    Console.WriteLine("Service is closed");
+    Console.ReadKey();
 }
+StudentService/
+ public class StudentService : IStudentService
+ {
+     private readonly string folderPath;
+
+     public StudentService()
+     {
+         //možete staviti i putanju "C:\Studenti\Data" u App.config ukoliko vam je lakše
+         //direktorijum "Data" se nalazi u bin\Debug
+         string relativePath = System.Configuration.ConfigurationManager.AppSettings["StudentFilesPath"];
+         folderPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, relativePath);
+     } 
+     public string GetStudentInfo(string indeks)
+     {
+         string filePath = Path.Combine(folderPath, $"{indeks}.txt");
+
+         if (!File.Exists(filePath))
+         {
+             throw new FaultException<StudentNotFoundException>(
+                 new StudentNotFoundException($"Student sa indeksom {indeks} nije pronađen."),
+                 "StudentNotFoundException");
+         }
+
+         return File.ReadAllText(filePath);
+     }
+ }
+
+Client//
+Program/
+ static void Main(string[] args)
+ {
+     ChannelFactory<IStudentService> factory =
+     new ChannelFactory<IStudentService>("StudentService");
+     IStudentService proxy = factory.CreateChannel();
+
+     while (true)
+     {
+         Console.Write("Unesite broj indeksa (ili 'exit' za kraj): ");
+         string indeks = Console.ReadLine();
+
+         if (string.IsNullOrWhiteSpace(indeks) || indeks.ToLower() == "exit")
+             break;
+
+         try
+         {
+             var podaci = proxy.GetStudentInfo(indeks);
+             Console.WriteLine("\n--- Podaci o studentu ---");
+             Console.WriteLine(podaci);
+         }
+         catch (FaultException<StudentNotFoundException> ex)
+         {
+             Console.WriteLine($"Greška: {ex.Detail.Message}");
+         }
+
+         Console.WriteLine();
+     }
+ }
 
 
+//2
 
-================================================================================
-FAJL: Models/MobilniTelefon.cs
-================================================================================
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Web;
+Package/
+ public string Code { get; set; }
+ public string Name { get; set; }
+ public double Price { get; set; }
 
-namespace SOV2.Models
-{
-    public class MobilniTelefon
-    {
-        public string Id { get; set; }
-        public string Procesor { get; set; }
-        public string VelicinaBaterije { get; set; }
-        public Proizvodjac Proizvodjac { get; set; }
-        public OperativniSistem OperativniSistem { get; set; }
+ public Package(string code, string name, double price)
+ {
+     Code = code;
+     Name = name;
+     Price = price;
+ }
 
-        public MobilniTelefon() { }
-
-        public MobilniTelefon(string id, string procesor, string velicinaBaterije,
-                              Proizvodjac proizvodjac, OperativniSistem operativniSistem)
-        {
-            Id = id;
-            Procesor = procesor;
-            VelicinaBaterije = velicinaBaterije;
-            Proizvodjac = proizvodjac;
-            OperativniSistem = operativniSistem;
-        }
-    }
-}
+ public override string ToString()
+ {
+     return $"Code: {Code}, Name: {Name}, Price: {Price}";
+ }
 
 
+EventGenerator/
+ public delegate void PackageHandler(Package p);
 
-============================
-FAJL: Controllers/HomeController.cs
-========================
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Web;
-using System.Web.Mvc;
-using SOV2.Models;
+ public event PackageHandler InvalidPackageEvent;
+ public event PackageHandler ExpensivePackageEvent;
 
-namespace SOV2.Controllers
-{
-    public class HomeController : Controller
-    {
-        // GET: Home - pocetna stranica sa formom za unos
-        public ActionResult Index()
-        {
-            return View();
-        }
+ public List<Package> RegularPackages { get; private set; }
+ public List<Package> ExpensivePackages { get; private set; }
+ public List<Package> InvalidPackages { get; private set; }
 
-        // POST: Home/Dodaj - dodavanje novog mobilnog telefona
-        [HttpPost]
-        public ActionResult Dodaj(MobilniTelefon telefon)
-        {
-            List<MobilniTelefon> telefoni = (List<MobilniTelefon>)HttpContext.Application["telefoni"];
+ private int fileCounter = 1;
 
-            // Provera da li telefon sa tim Id-em vec postoji
-            MobilniTelefon postojeci = telefoni.Find(t => t.Id.Equals(telefon.Id));
-            if (postojeci != null)
-            {
-                ViewBag.Greska = "Mobilni telefon sa tim id-em vec postoji!";
-                return View("Index");
-            }
+ public EventGenerator()
+ {
+     RegularPackages = new List<Package>();
+     ExpensivePackages = new List<Package>();
+     InvalidPackages = new List<Package>();
 
-            telefoni.Add(telefon);
-            HttpContext.Application["telefoni"] = telefoni;
+     if (!Directory.Exists("Data"))
+     {
+         Directory.CreateDirectory("Data");
+     }
+ }
 
-            return RedirectToAction("Spisak");
-        }
+ public void ProcessPackage(Package p)
+ {
+     if (string.IsNullOrWhiteSpace(p.Code) ||
+         string.IsNullOrWhiteSpace(p.Name))
+     {
+         InvalidPackages.Add(p);
 
-        // GET: Home/Spisak - tabelarni prikaz svih telefona
-        public ActionResult Spisak()
-        {
-            List<MobilniTelefon> telefoni = (List<MobilniTelefon>)HttpContext.Application["telefoni"];
-            return View(telefoni);
-        }
+         if (InvalidPackageEvent != null)
+         {
+             InvalidPackageEvent(p);
+         }
 
-        // GET: Home/Filtriraj?proizvodjac=Apple - filtriranje po proizvodjacu
-        public ActionResult Filtriraj(string proizvodjac)
-        {
-            List<MobilniTelefon> telefoni = (List<MobilniTelefon>)HttpContext.Application["telefoni"];
+         return;
+     }
 
-            if (string.IsNullOrEmpty(proizvodjac))
-            {
-                return View("Spisak", telefoni);
-            }
+     string filePath = $"Data/package_{fileCounter}.txt";
 
-            Proizvodjac odabrani = (Proizvodjac)Enum.Parse(typeof(Proizvodjac), proizvodjac);
-            List<MobilniTelefon> filtrirani = telefoni.FindAll(t => t.Proizvodjac == odabrani);
+     using (StreamWriter sw = new StreamWriter(filePath))
+     {
+         sw.WriteLine(p.ToString());
+     }
 
-            return View("Spisak", filtrirani);
-        }
-    }
-}
+     fileCounter++;
 
+     if (p.Price > 1000)
+     {
+         ExpensivePackages.Add(p);
 
+         if (ExpensivePackageEvent != null)
+         {
+             ExpensivePackageEvent(p);
+         }
+     }
+     else
+     {
+         RegularPackages.Add(p);
+     }
 
-=====================
-FAJL: Views/Home/Index.cshtml
-====================
-@using SOV2.Models
+Listener/
+ public void OnInvalidPackage(Package p)
+ {
+     Console.WriteLine("INVALID PACKAGE EVENT!");
+     Console.WriteLine($"Package is invalid: {p}");
+     Console.WriteLine();
+ }
 
-@{
-    ViewBag.Title = "Grupa 7B";
-}
+ public void OnExpensivePackage(Package p)
+ {
+     Console.WriteLine("EXPENSIVE PACKAGE EVENT!");
+     Console.WriteLine($"Expensive package detected: {p}");
+     Console.WriteLine();
+ }
 
-<h1 style="text-align:center;">Grupa 7B</h1>
+Program/
+ EventGenerator generator = new EventGenerator();
+ Listener listener = new Listener();
 
-<p>
-    Kreirati ASP.NET MVC aplikaciju koja vodi evidenciju o mobilnim telefonima.
-    Kao klijentsku aplikaciju koristiti veb pretraživač (npr. Google Chrome).
-    Za svaki telefon se evidentiraju identifikator, procesor, velicina baterije,
-    proizvođač i operativni sistem. Operativni sistem može imati jednu od sledećih
-    vrednosti: <b>Android</b> i <b>iOS</b>. Proizvođač može imati jednu od
-    sledećih vrednosti: <b>Apple</b>, <b>Samsung</b> i <b>Xiaomi</b>. Klijent na
-    server šalje parametre iz forme za unos (Slika 1):
-</p>
+ generator.InvalidPackageEvent += listener.OnInvalidPackage;
+ generator.ExpensivePackageEvent += listener.OnExpensivePackage;
 
-@if (ViewBag.Greska != null)
-{
-    <h2 style="color:red;">@ViewBag.Greska</h2>
-}
+ while (true)
+ {
+     Console.WriteLine("Enter package code (or END to finish):");
+     string code = Console.ReadLine();
 
-<h2>Unos novog mobilnog telefona</h2>
+     if (code.ToUpper() == "END")
+     {
+         break;
+     }
 
-<form method="post" action="~/Home/Dodaj">
-    <table>
-        <tr>
-            <td>Id:</td>
-            <td><input type="text" name="Id" /></td>
-        </tr>
-        <tr>
-            <td>Procesor:</td>
-            <td><input type="text" name="Procesor" /></td>
-        </tr>
-        <tr>
-            <td>Velicina baterije:</td>
-            <td><input type="text" name="VelicinaBaterije" /></td>
-        </tr>
-        <tr>
-            <td>Proizvodjac:</td>
-            <td>
-                <select name="Proizvodjac">
-                    @foreach (var p in Enum.GetValues(typeof(Proizvodjac)))
-                    {
-                        <option value="@p">@p</option>
-                    }
-                </select>
-            </td>
-        </tr>
-        <tr>
-            <td>Operativni sistem:</td>
-            <td>
-                <select name="OperativniSistem">
-                    @foreach (var o in Enum.GetValues(typeof(OperativniSistem)))
-                    {
-                        <option value="@o">@o</option>
-                    }
-                </select>
-            </td>
-        </tr>
-        <tr>
-            <td colspan="2">
-                <input type="submit" value="Dodaj" />
-            </td>
-        </tr>
-    </table>
-</form>
+     Console.WriteLine("Enter package name:");
+     string name = Console.ReadLine();
 
-<hr />
+     Console.WriteLine("Enter package price:");
 
-<h2>Filtriraj po proizvodjacu</h2>
+     double price;
 
-<form method="get" action="~/Home/Filtriraj">
-    <table>
-        <tr>
-            <td>Proizvodjac:</td>
-            <td>
-                <select name="proizvodjac">
-                    @foreach (var p in Enum.GetValues(typeof(Proizvodjac)))
-                    {
-                        <option value="@p">@p</option>
-                    }
-                </select>
-            </td>
-        </tr>
-        <tr>
-            <td colspan="2">
-                <input type="submit" value="Filtriraj" />
-            </td>
-        </tr>
-    </table>
-</form>
+     while (!double.TryParse(Console.ReadLine(), out price))
+     {
+         Console.WriteLine("Invalid number! Enter package price again:");
+     }
 
+     Package p = new Package(code, name, price);
 
+     generator.ProcessPackage(p);
 
-================
-FAJL: Views/Home/Spisak.cshtml
-=======================
-@using SOV2.Models
-@model IEnumerable<MobilniTelefon>
+     Console.WriteLine("-----------------------------------");
+ }
 
-@{
-    ViewBag.Title = "Spisak mobilnih telefona";
-}
+ Console.WriteLine();
+ Console.WriteLine("===== REGULAR PACKAGES =====");
 
-<table border="1" cellpadding="5" cellspacing="0">
-    <tr>
-        <th colspan="5" style="text-align:center;">Spisak mobilnih telefona</th>
-    </tr>
-    <tr>
-        <th>Id</th>
-        <th>Procesor</th>
-        <th>Velicina baterija</th>
-        <th>Proizvodjac</th>
-        <th>Operativni sistem</th>
-    </tr>
-    @foreach (var telefon in Model)
-    {
-        <tr>
-            <td>@telefon.Id</td>
-            <td>@telefon.Procesor</td>
-            <td>@telefon.VelicinaBaterije</td>
-            <td>@telefon.Proizvodjac</td>
-            <td>@telefon.OperativniSistem</td>
-        </tr>
-    }
-</table>
+ foreach (Package p in generator.RegularPackages)
+ {
+     Console.WriteLine(p);
+ }
 
-<br />
+ Console.WriteLine();
+ Console.WriteLine("===== EXPENSIVE PACKAGES =====");
 
-<a href="~/Home/Index">Nazad</a>
+ foreach (Package p in generator.ExpensivePackages)
+ {
+     Console.WriteLine(p);
+ }
 
+ Console.WriteLine();
+ Console.WriteLine("===== INVALID PACKAGES =====");
 
+ foreach (Package p in generator.InvalidPackages)
+ {
+     Console.WriteLine(p);
+ }
 
-====================================
-FAJL: Global.asax.cs   (PREPRAVITI postojeci Application_Start)
-======================
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Web;
-using System.Web.Mvc;
-using System.Web.Optimization;
-using System.Web.Routing;
-using SOV2.Models;
-
-namespace SOV2
-{
-    public class MvcApplication : System.Web.HttpApplication
-    {
-        protected void Application_Start()
-        {
-            AreaRegistration.RegisterAllAreas();
-            FilterConfig.RegisterGlobalFilters(GlobalFilters.Filters);
-            RouteConfig.RegisterRoutes(RouteTable.Routes);
-            BundleConfig.RegisterBundles(BundleTable.Bundles);
-
-            // Inicijalna lista mobilnih telefona (test podaci sa Slike 2)
-            List<MobilniTelefon> telefoni = new List<MobilniTelefon>
-            {
-                new MobilniTelefon("1", "A15 Bionic", "2800 mAh",
-                                   Proizvodjac.Apple, OperativniSistem.iOS),
-                new MobilniTelefon("2", "Snapdragon 845", "3500 mAh",
-                                   Proizvodjac.Samsung, OperativniSistem.Android),
-                new MobilniTelefon("3", "Snapdragon 865", "4500 mAh",
-                                   Proizvodjac.Xiaomi, OperativniSistem.Android)
-            };
-
-            HttpContext.Current.Application["telefoni"] = telefoni;
-        }
-    }
-}
-
-
-
-================================================================================
-NAPOMENE:
-================================================================================
-
-1. Default ruta (App_Start/RouteConfig.cs) - NE diraj, ostavi default.
-   Default je { controller = "Home", action = "Index" } sto je tacno ono
-   sto nam treba (otvara Index.cshtml na pocetnoj).
-
-2. Layout - mozes ostaviti default _Layout.cshtml ili obrisati liniju u
-   _ViewStart.cshtml ako zelis ciste stranice. Test za zadatak je da
-   funkcionalnost radi.
-
-3. Test podaci (A15 Bionic / Snapdragon 845 / Snapdragon 865) ucitavaju se
-   automatski pri pokretanju aplikacije iz Global.asax.cs - tako da kad
-   kliknes "Dodaj" prvi put i odes na spisak vec ces videti 3 telefona.
-
-4. Tok aplikacije:
-   - Otvara se Index.cshtml (forma za unos + filter)
-   - Klik na "Dodaj" -> POST na /Home/Dodaj
-     * Ako Id postoji -> ostaje na Index sa porukom (Slika 3)
-     * Ako Id ne postoji -> RedirectToAction na Spisak (Slika 2)
-   - Klik na "Filtriraj" -> GET na /Home/Filtriraj?proizvodjac=X
-     * Vraca View "Spisak" sa filtriranom listom (Slika 4)
-   - Klik na "Nazad" na spisku -> vraca na Index.cshtml
-
-5. Validacija - tekst poruke "Mobilni telefon sa tim id-em vec postoji!"
-   je tacno onako kako je trazeno na Slici 3.
-
-6. Sva polja se salju kao stringovi/enumi - automatic model binding ce
-   da popuni MobilniTelefon objekat.
-
-
-
-================================================================================
-KRAJ FAJLA
-================================================================================
-
-
-================================================================================
-RANKOVA 4 ERORA
-================================================================================
- Neka zameni ceo sadrzaj Global.asax.cs ovim:
-
-// Datoteka: Global.asax.cs
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Web;
-using System.Web.Mvc;
-using System.Web.Routing;
-using SOV2.Models;
-
-namespace SOV2
-{
-    public class MvcApplication : System.Web.HttpApplication
-    {
-        protected void Application_Start()
-        {
-            AreaRegistration.RegisterAllAreas();
-            RouteConfig.RegisterRoutes(RouteTable.Routes);
-
-            // Inicijalna lista mobilnih telefona (test podaci sa Slike 2)
-            List<MobilniTelefon> telefoni = new List<MobilniTelefon>
-            {
-                new MobilniTelefon("1", "A15 Bionic", "2800 mAh",
-                                   Proizvodjac.Apple, OperativniSistem.iOS),
-                new MobilniTelefon("2", "Snapdragon 845", "3500 mAh",
-                                   Proizvodjac.Samsung, OperativniSistem.Android),
-                new MobilniTelefon("3", "Snapdragon 865", "4500 mAh",
-                                   Proizvodjac.Xiaomi, OperativniSistem.Android)
-            };
-
-            HttpContext.Current.Application["telefoni"] = telefoni;
-        }
-    }
-}
-
-Nakon ovoga Build → Rebuild Solution i sve 4 greske ce nestati. Posto njegov template nema bundles/filters konfiguraciju, te linije nisu ni potrebne za rad zadatka.
+ Console.ReadKey();

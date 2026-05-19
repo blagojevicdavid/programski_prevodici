@@ -1,25 +1,21 @@
-                    GRUPA 7B - ASP.NET MVC RESENJE
-              Aplikacija za evidenciju mobilnih telefona
-========
-
 UPUTSTVO:
 1. U Visual Studio kreiraj novi prazan ASP.NET Web Application (.NET Framework)
-   projekat sa MVC opcijom. Naziv projekta: Grupa7B
+   projekat sa MVC opcijom. Naziv projekta: SOV2
    (File > New Project > ASP.NET Web Application (.NET Framework) > Empty + MVC)
 
 2. U projektu kreiraj sledecu strukturu fajlova i kopiraj sadrzaj ispod.
 
 3. NAPOMENA o namespace-u: Ako tvoj projekat ima drugaciji naziv,
-   zameni svuda "Grupa7B" sa nazivom tvog projekta.
+   zameni svuda "SOV2" sa nazivom tvog projekta.
 
 4. Pokreni projekat (F5) - otvara se Index stranica sa formom za unos.
 
 
-================
+===================================
 STRUKTURA PROJEKTA (sta gde ide):
-================
+=========================
 
-Grupa7B/
+SOV2/
 ├── Models/
 │   ├── MobilniTelefon.cs
 │   ├── Proizvodjac.cs           (enum)
@@ -37,15 +33,15 @@ Grupa7B/
 
 
 
-=============
+========================
 FAJL: Models/Proizvodjac.cs
-=============
+=====================
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Web;
 
-namespace Grupa7B.Models
+namespace SOV2.Models
 {
     public enum Proizvodjac
     {
@@ -57,15 +53,15 @@ namespace Grupa7B.Models
 
 
 
-==================
+=====================
 FAJL: Models/OperativniSistem.cs
-==================
+====================
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Web;
 
-namespace Grupa7B.Models
+namespace SOV2.Models
 {
     public enum OperativniSistem
     {
@@ -76,15 +72,15 @@ namespace Grupa7B.Models
 
 
 
-=================
+================================================================================
 FAJL: Models/MobilniTelefon.cs
-==============
+================================================================================
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Web;
 
-namespace Grupa7B.Models
+namespace SOV2.Models
 {
     public class MobilniTelefon
     {
@@ -110,17 +106,17 @@ namespace Grupa7B.Models
 
 
 
-===============
+============================
 FAJL: Controllers/HomeController.cs
-==============
+========================
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Web;
 using System.Web.Mvc;
-using Grupa7B.Models;
+using SOV2.Models;
 
-namespace Grupa7B.Controllers
+namespace SOV2.Controllers
 {
     public class HomeController : Controller
     {
@@ -177,10 +173,10 @@ namespace Grupa7B.Controllers
 
 
 
-===================
+=====================
 FAJL: Views/Home/Index.cshtml
-===================
-@using Grupa7B.Models
+====================
+@using SOV2.Models
 
 @{
     ViewBag.Title = "Grupa 7B";
@@ -276,10 +272,10 @@ FAJL: Views/Home/Index.cshtml
 
 
 
-========================
+================
 FAJL: Views/Home/Spisak.cshtml
 =======================
-@using Grupa7B.Models
+@using SOV2.Models
 @model IEnumerable<MobilniTelefon>
 
 @{
@@ -315,9 +311,9 @@ FAJL: Views/Home/Spisak.cshtml
 
 
 
-======================
+====================================
 FAJL: Global.asax.cs   (PREPRAVITI postojeci Application_Start)
-====================
+======================
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -325,9 +321,9 @@ using System.Web;
 using System.Web.Mvc;
 using System.Web.Optimization;
 using System.Web.Routing;
-using Grupa7B.Models;
+using SOV2.Models;
 
-namespace Grupa7B
+namespace SOV2
 {
     public class MvcApplication : System.Web.HttpApplication
     {

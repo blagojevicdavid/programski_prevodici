@@ -388,3 +388,43 @@ NAPOMENE:
 ================================================================================
 KRAJ FAJLA
 ================================================================================
+
+
+================================================================================
+RANKOVA 4 ERORA
+================================================================================
+ Neka zameni ceo sadrzaj Global.asax.cs ovim:
+
+// Datoteka: Global.asax.cs
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+using System.Web.Mvc;
+using System.Web.Routing;
+using SOV2.Models;
+
+namespace SOV2
+{
+    public class MvcApplication : System.Web.HttpApplication
+    {
+        protected void Application_Start()
+        {
+            AreaRegistration.RegisterAllAreas();
+            RouteConfig.RegisterRoutes(RouteTable.Routes);
+
+            // Inicijalna lista mobilnih telefona (test podaci sa Slike 2)
+            List<MobilniTelefon> telefoni = new List<MobilniTelefon>
+            {
+                new MobilniTelefon("1", "A15 Bionic", "2800 mAh",
+                                   Proizvodjac.Apple, OperativniSistem.iOS),
+                new MobilniTelefon("2", "Snapdragon 845", "3500 mAh",
+                                   Proizvodjac.Samsung, OperativniSistem.Android),
+                new MobilniTelefon("3", "Snapdragon 865", "4500 mAh",
+                                   Proizvodjac.Xiaomi, OperativniSistem.Android)
+            };
+
+            HttpContext.Current.Application["telefoni"] = telefoni;
+        }
+    }
+}

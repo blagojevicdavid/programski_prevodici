@@ -1,1 +1,341 @@
-NIJE ovaj
+===================================
+STRUKTURA PROJEKTA (sta gde ide):
+=========================
+ 
+SOV2/
+├── Models/
+│   ├── Porudzbina.cs
+│   └── BojaCveta.cs             (enum)
+├── Controllers/
+│   └── HomeController.cs
+├── Views/
+│   └── Home/
+│       ├── Index.cshtml         (forma za unos + pretraga)
+│       └── Spisak.cshtml        (tabela porudzbina)
+└── Global.asax.cs               (vec postoji - prepravi Application_Start)
+ 
+ 
+ 
+========================
+FAJL: Models/BojaCveta.cs
+=====================
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+ 
+namespace SOV2.Models
+{
+    public enum BojaCveta
+    {
+        Crvena,
+        Bela,
+        Zuta
+    }
+}
+ 
+ 
+ 
+================================================================================
+FAJL: Models/Porudzbina.cs
+================================================================================
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+ 
+namespace SOV2.Models
+{
+    public class Porudzbina
+    {
+        public string Id { get; set; }
+        public string Naziv { get; set; }
+        public string Kolicina { get; set; }
+        public BojaCveta Boja { get; set; }
+        public bool Hitno { get; set; }
+ 
+        public Porudzbina() { }
+ 
+        public Porudzbina(string id, string naziv, string kolicina,
+                          BojaCveta boja, bool hitno)
+        {
+            Id = id;
+            Naziv = naziv;
+            Kolicina = kolicina;
+            Boja = boja;
+            Hitno = hitno;
+        }
+    }
+}
+ 
+ 
+ 
+============================
+FAJL: Controllers/HomeController.cs
+========================
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+using System.Web.Mvc;
+using SOV2.Models;
+ 
+namespace SOV2.Controllers
+{
+    public class HomeController : Controller
+    {
+        // GET: Home - pocetna stranica sa formom za unos i pretragu
+        public ActionResult Index()
+        {
+            return View();
+        }
+ 
+        // POST: Home/Dodaj - dodavanje nove porudzbine
+        [HttpPost]
+        public ActionResult Dodaj(Porudzbina porudzbina)
+        {
+            List<Porudzbina> porudzbine = (List<Porudzbina>)HttpContext.Application["porudzbine"];
+ 
+            // Provera da li porudzbina sa tim Id-em vec postoji
+            Porudzbina postojeca = porudzbine.Find(p => p.Id.Equals(porudzbina.Id));
+            if (postojeca != null)
+            {
+                ViewBag.Greska = "Porudzbina sa unetim id vec postoji!";
+                return View("Index");
+            }
+ 
+            porudzbine.Add(porudzbina);
+            HttpContext.Application["porudzbine"] = porudzbine;
+ 
+            return RedirectToAction("Spisak");
+        }
+ 
+        // GET: Home/Spisak - tabelarni prikaz svih porudzbina
+        public ActionResult Spisak()
+        {
+            List<Porudzbina> porudzbine = (List<Porudzbina>)HttpContext.Application["porudzbine"];
+            return View(porudzbine);
+        }
+ 
+        // GET: Home/Pretrazi?naziv=... - pretraga po nazivu (jednak)
+        public ActionResult Pretrazi(string naziv)
+        {
+            List<Porudzbina> porudzbine = (List<Porudzbina>)HttpContext.Application["porudzbine"];
+ 
+            if (string.IsNullOrEmpty(naziv))
+            {
+                return View("Spisak", porudzbine);
+            }
+ 
+            List<Porudzbina> pronadjene = porudzbine.FindAll(p => p.Naziv.Equals(naziv));
+ 
+            return View("Spisak", pronadjene);
+        }
+    }
+}
+ 
+ 
+ 
+=====================
+FAJL: Views/Home/Index.cshtml
+====================
+@using SOV2.Models
+ 
+@{
+    ViewBag.Title = "Grupa 15A";
+}
+ 
+<h1 style="text-align:center;">Grupa 15A</h1>
+ 
+<p>
+    Kreirati ASP.NET MVC aplikaciju koja omogućava poručivanje cveća za cvećaru
+    (dopuna inventara). Kao klijentsku aplikaciju koristiti veb pretraživač
+    (npr. Google Chrome). Za svaku porudžbinu se unosi identifikator, naziv
+    cveta, količina, boja cveta i da li je hitno. Tip cveta može imati jednu
+    od sledećih vrednosti: <b>Crvena</b>, <b>Bela</b> i <b>Zuta</b>. Klijent
+    na server šalje parametre iz forme za poručivanje (Slika 1):
+</p>
+ 
+@if (ViewBag.Greska != null)
+{
+    <h2 style="color:red; text-align:center;">@ViewBag.Greska</h2>
+}
+ 
+<h3>Nova porudzbina cveca</h3>
+ 
+<form method="post" action="~/Home/Dodaj">
+    <table>
+        <tr>
+            <td>Id:</td>
+            <td><input type="text" name="Id" /></td>
+        </tr>
+        <tr>
+            <td>Naziv:</td>
+            <td><input type="text" name="Naziv" /></td>
+        </tr>
+        <tr>
+            <td>Kolicina:</td>
+            <td><input type="text" name="Kolicina" /></td>
+        </tr>
+        <tr>
+            <td>Boja cveta:</td>
+            <td>
+                <select name="Boja">
+                    @foreach (var b in Enum.GetValues(typeof(BojaCveta)))
+                    {
+                        <option value="@b">@b</option>
+                    }
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td>Hitna porudzbina?</td>
+            <td><input type="checkbox" name="Hitno" value="true" /></td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <input type="submit" value="Dodaj" />
+            </td>
+        </tr>
+    </table>
+</form>
+ 
+<br />
+ 
+<h3>Pretraga:</h3>
+ 
+<form method="get" action="~/Home/Pretrazi">
+    <table>
+        <tr>
+            <td>Naziv:</td>
+            <td><input type="text" name="naziv" /></td>
+            <td><input type="submit" value="Trazi" /></td>
+        </tr>
+    </table>
+</form>
+ 
+ 
+ 
+================
+FAJL: Views/Home/Spisak.cshtml
+=======================
+@using SOV2.Models
+@model IEnumerable<Porudzbina>
+ 
+@{
+    ViewBag.Title = "Porudzbine cveca";
+}
+ 
+<table border="1" cellpadding="5" cellspacing="0">
+    <tr>
+        <th colspan="5" style="text-align:center;">Porudzbine cveca</th>
+    </tr>
+    <tr>
+        <th>Id</th>
+        <th>Naziv</th>
+        <th>Kolicina</th>
+        <th>Boja</th>
+        <th>Hitno?</th>
+    </tr>
+    @foreach (var porudzbina in Model)
+    {
+        <tr>
+            <td>@porudzbina.Id</td>
+            <td>@porudzbina.Naziv</td>
+            <td>@porudzbina.Kolicina</td>
+            <td>@porudzbina.Boja</td>
+            <td>@(porudzbina.Hitno ? "Da" : "Ne")</td>
+        </tr>
+    }
+</table>
+ 
+<br />
+ 
+<a href="~/Home/Index">Nazad</a>
+ 
+ 
+ 
+====================================
+FAJL: Global.asax.cs   (PREPRAVITI postojeci Application_Start)
+======================
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+using System.Web.Mvc;
+using System.Web.Optimization;
+using System.Web.Routing;
+using SOV2.Models;
+ 
+namespace SOV2
+{
+    public class MvcApplication : System.Web.HttpApplication
+    {
+        protected void Application_Start()
+        {
+            AreaRegistration.RegisterAllAreas();
+ 
+            RouteConfig.RegisterRoutes(RouteTable.Routes);
+ 
+ 
+            // Inicijalna lista porudzbina (test podaci sa Slike 2)
+            List<Porudzbina> porudzbine = new List<Porudzbina>
+            {
+                new Porudzbina("1", "Ruza", "50", BojaCveta.Crvena, true),
+                new Porudzbina("2", "Ljiljan", "30", BojaCveta.Bela, false),
+                new Porudzbina("3", "Lala", "20", BojaCveta.Zuta, false)
+            };
+ 
+            HttpContext.Current.Application["porudzbine"] = porudzbine;
+        }
+    }
+}
+ 
+ 
+ 
+================================================================================
+NAPOMENE:
+================================================================================
+ 
+1. Default ruta (App_Start/RouteConfig.cs) - NE diraj, ostavi default.
+   Default je { controller = "Home", action = "Index" } sto je tacno ono
+   sto nam treba (otvara Index.cshtml na pocetnoj).
+ 
+2. Layout - ne koristi se _Layout.cshtml jer projekat je kreiran kao Empty + MVC
+   pa Shared folder ne postoji. Stranice su ciste bez layouta.
+ 
+3. Test podaci (Ruza / Ljiljan / Lala) ucitavaju se automatski pri pokretanju
+   aplikacije iz Global.asax.cs - tako da odmah kad odes na spisak vec ces
+   videti 3 porudzbine.
+ 
+4. Tok aplikacije:
+   - Otvara se Index.cshtml (forma za unos + pretraga)
+   - Klik na "Dodaj" -> POST na /Home/Dodaj
+     * Ako Id vec postoji -> ostaje na Index sa porukom "Porudzbina sa unetim
+       id vec postoji!" (Slika 3)
+     * Ako Id ne postoji -> RedirectToAction na Spisak (Slika 2)
+   - Klik na "Trazi" -> GET na /Home/Pretrazi?naziv=X
+     * Vraca View "Spisak" sa porudzbinama kod kojih je naziv JEDNAK unetoj
+       vrednosti (exact match - npr. "Ruza" pronalazi samo "Ruza", ne i "Ruzica")
+   - Klik na "Nazad" na spisku -> vraca na Index.cshtml
+ 
+5. Validacija - tekst poruke "Porudzbina sa unetim id vec postoji!" je tacno
+   onako kako je trazeno na Slici 3.
+ 
+6. Checkbox za Hitno:
+   - Kada je cekiran, salje vrednost "true" -> model binding automatski setuje
+     bool na true.
+   - Kada nije cekiran, checkbox ne salje nista -> bool ostaje default false.
+   - U tabeli se prikazuje kao "Da" / "Ne" preko ternary operatora.
+ 
+7. Pretraga po nazivu radi po EXACT MATCH-u (Equals), kako je trazeno u zadatku:
+   "prikazuju se iskljucivo porudzbine kojima se porucuje cvece ciji naziv je
+   jednak unetom nazivu".
+ 
+8. Sva polja se salju kao stringovi/enumi/bool - automatic model binding ce
+   da popuni Porudzbina objekat.
+ 
+ 
+ 
+================================================================================
+KRAJ FAJLA

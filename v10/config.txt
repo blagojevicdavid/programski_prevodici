@@ -4,20 +4,20 @@ STRUKTURA PROJEKTA (sta gde ide):
  
 SOV2/
 ├── Models/
-│   ├── Porudzbina.cs
-│   └── BojaCveta.cs             (enum)
+│   ├── Igrac.cs
+│   └── Pozicija.cs              (enum)
 ├── Controllers/
 │   └── HomeController.cs
 ├── Views/
 │   └── Home/
 │       ├── Index.cshtml         (forma za unos + pretraga)
-│       └── Spisak.cshtml        (tabela porudzbina)
+│       └── Spisak.cshtml        (tabela igraca)
 └── Global.asax.cs               (vec postoji - prepravi Application_Start)
  
  
  
 ========================
-FAJL: Models/BojaCveta.cs
+FAJL: Models/Pozicija.cs
 =====================
 using System;
 using System.Collections.Generic;
@@ -26,18 +26,18 @@ using System.Web;
  
 namespace SOV2.Models
 {
-    public enum BojaCveta
+    public enum Pozicija
     {
-        Crvena,
-        Bela,
-        Zuta
+        Centar,
+        Krilo,
+        Bek
     }
 }
  
  
  
 ================================================================================
-FAJL: Models/Porudzbina.cs
+FAJL: Models/Igrac.cs
 ================================================================================
 using System;
 using System.Collections.Generic;
@@ -46,24 +46,24 @@ using System.Web;
  
 namespace SOV2.Models
 {
-    public class Porudzbina
+    public class Igrac
     {
-        public string Id { get; set; }
-        public string Naziv { get; set; }
-        public string Kolicina { get; set; }
-        public BojaCveta Boja { get; set; }
-        public bool Hitno { get; set; }
+        public string Ime { get; set; }
+        public string Prezime { get; set; }
+        public string BrojDresa { get; set; }
+        public Pozicija Pozicija { get; set; }
+        public bool Reprezentativac { get; set; }
  
-        public Porudzbina() { }
+        public Igrac() { }
  
-        public Porudzbina(string id, string naziv, string kolicina,
-                          BojaCveta boja, bool hitno)
+        public Igrac(string ime, string prezime, string brojDresa,
+                     Pozicija pozicija, bool reprezentativac)
         {
-            Id = id;
-            Naziv = naziv;
-            Kolicina = kolicina;
-            Boja = boja;
-            Hitno = hitno;
+            Ime = ime;
+            Prezime = prezime;
+            BrojDresa = brojDresa;
+            Pozicija = pozicija;
+            Reprezentativac = reprezentativac;
         }
     }
 }
@@ -90,46 +90,46 @@ namespace SOV2.Controllers
             return View();
         }
  
-        // POST: Home/Dodaj - dodavanje nove porudzbine
+        // POST: Home/Dodaj - dodavanje novog igraca
         [HttpPost]
-        public ActionResult Dodaj(Porudzbina porudzbina)
+        public ActionResult Dodaj(Igrac igrac)
         {
-            List<Porudzbina> porudzbine = (List<Porudzbina>)HttpContext.Application["porudzbine"];
+            List<Igrac> igraci = (List<Igrac>)HttpContext.Application["igraci"];
  
-            // Provera da li porudzbina sa tim Id-em vec postoji
-            Porudzbina postojeca = porudzbine.Find(p => p.Id.Equals(porudzbina.Id));
-            if (postojeca != null)
+            // Provera da li igrac sa tim brojem dresa vec postoji
+            Igrac postojeci = igraci.Find(i => i.BrojDresa.Equals(igrac.BrojDresa));
+            if (postojeci != null)
             {
-                ViewBag.Greska = "Porudzbina sa unetim id vec postoji!";
+                ViewBag.Greska = "Uneti broj dresa nije jedinstven!";
                 return View("Index");
             }
  
-            porudzbine.Add(porudzbina);
-            HttpContext.Application["porudzbine"] = porudzbine;
+            igraci.Add(igrac);
+            HttpContext.Application["igraci"] = igraci;
  
             return RedirectToAction("Spisak");
         }
  
-        // GET: Home/Spisak - tabelarni prikaz svih porudzbina
+        // GET: Home/Spisak - tabelarni prikaz svih igraca
         public ActionResult Spisak()
         {
-            List<Porudzbina> porudzbine = (List<Porudzbina>)HttpContext.Application["porudzbine"];
-            return View(porudzbine);
+            List<Igrac> igraci = (List<Igrac>)HttpContext.Application["igraci"];
+            return View(igraci);
         }
  
-        // GET: Home/Pretrazi?naziv=... - pretraga po nazivu (jednak)
-        public ActionResult Pretrazi(string naziv)
+        // GET: Home/Pretrazi?prezime=... - pretraga po prezimenu (sadrzi)
+        public ActionResult Pretrazi(string prezime)
         {
-            List<Porudzbina> porudzbine = (List<Porudzbina>)HttpContext.Application["porudzbine"];
+            List<Igrac> igraci = (List<Igrac>)HttpContext.Application["igraci"];
  
-            if (string.IsNullOrEmpty(naziv))
+            if (string.IsNullOrEmpty(prezime))
             {
-                return View("Spisak", porudzbine);
+                return View("Spisak", igraci);
             }
  
-            List<Porudzbina> pronadjene = porudzbine.FindAll(p => p.Naziv.Equals(naziv));
+            List<Igrac> pronadjeni = igraci.FindAll(i => i.Prezime.ToLower().Contains(prezime.ToLower()));
  
-            return View("Spisak", pronadjene);
+            return View("Spisak", pronadjeni);
         }
     }
 }
@@ -142,18 +142,18 @@ FAJL: Views/Home/Index.cshtml
 @using SOV2.Models
  
 @{
-    ViewBag.Title = "Grupa 15A";
+    ViewBag.Title = "Grupa 15B";
 }
  
-<h1 style="text-align:center;">Grupa 15A</h1>
+<h1 style="text-align:center;">Grupa 15B</h1>
  
 <p>
-    Kreirati ASP.NET MVC aplikaciju koja omogućava poručivanje cveća za cvećaru
-    (dopuna inventara). Kao klijentsku aplikaciju koristiti veb pretraživač
-    (npr. Google Chrome). Za svaku porudžbinu se unosi identifikator, naziv
-    cveta, količina, boja cveta i da li je hitno. Tip cveta može imati jednu
-    od sledećih vrednosti: <b>Crvena</b>, <b>Bela</b> i <b>Zuta</b>. Klijent
-    na server šalje parametre iz forme za poručivanje (Slika 1):
+    Kreirati ASP.NET MVC aplikaciju koja vodi evidenciju igrača u košarkaškom timu.
+    Kao klijentsku aplikaciju koristiti veb pretraživač (npr. Google Chrome).
+    Prilikom unosa novog igrača korisnik unosi ime, prezime, broj dresa, poziciju
+    i da li je reprezentativac. Pozicija igrača može imati jednu od sledećih
+    vrednosti: <b>Centar</b>, <b>Krilo</b> i <b>Bek</b>. Klijent na server šalje
+    parametre iz forme za unos (Slika 1):
 </p>
  
 @if (ViewBag.Greska != null)
@@ -161,36 +161,36 @@ FAJL: Views/Home/Index.cshtml
     <h2 style="color:red; text-align:center;">@ViewBag.Greska</h2>
 }
  
-<h3>Nova porudzbina cveca</h3>
+<h3>Unos igraca</h3>
  
 <form method="post" action="~/Home/Dodaj">
     <table>
         <tr>
-            <td>Id:</td>
-            <td><input type="text" name="Id" /></td>
+            <td>Ime:</td>
+            <td><input type="text" name="Ime" /></td>
         </tr>
         <tr>
-            <td>Naziv:</td>
-            <td><input type="text" name="Naziv" /></td>
+            <td>Prezime:</td>
+            <td><input type="text" name="Prezime" /></td>
         </tr>
         <tr>
-            <td>Kolicina:</td>
-            <td><input type="text" name="Kolicina" /></td>
+            <td>Broj dresa:</td>
+            <td><input type="text" name="BrojDresa" /></td>
         </tr>
         <tr>
-            <td>Boja cveta:</td>
+            <td>Pozicija:</td>
             <td>
-                <select name="Boja">
-                    @foreach (var b in Enum.GetValues(typeof(BojaCveta)))
+                <select name="Pozicija">
+                    @foreach (var p in Enum.GetValues(typeof(Pozicija)))
                     {
-                        <option value="@b">@b</option>
+                        <option value="@p">@p</option>
                     }
                 </select>
             </td>
         </tr>
         <tr>
-            <td>Hitna porudzbina?</td>
-            <td><input type="checkbox" name="Hitno" value="true" /></td>
+            <td>Da li je reprezentativac?</td>
+            <td><input type="checkbox" name="Reprezentativac" value="true" /></td>
         </tr>
         <tr>
             <td colspan="2">
@@ -207,8 +207,8 @@ FAJL: Views/Home/Index.cshtml
 <form method="get" action="~/Home/Pretrazi">
     <table>
         <tr>
-            <td>Naziv:</td>
-            <td><input type="text" name="naziv" /></td>
+            <td>Prezime:</td>
+            <td><input type="text" name="prezime" /></td>
             <td><input type="submit" value="Trazi" /></td>
         </tr>
     </table>
@@ -220,31 +220,31 @@ FAJL: Views/Home/Index.cshtml
 FAJL: Views/Home/Spisak.cshtml
 =======================
 @using SOV2.Models
-@model IEnumerable<Porudzbina>
+@model IEnumerable<Igrac>
  
 @{
-    ViewBag.Title = "Porudzbine cveca";
+    ViewBag.Title = "Igraci u klubu";
 }
  
 <table border="1" cellpadding="5" cellspacing="0">
     <tr>
-        <th colspan="5" style="text-align:center;">Porudzbine cveca</th>
+        <th colspan="5" style="text-align:center;">Igraci u klubu</th>
     </tr>
     <tr>
-        <th>Id</th>
-        <th>Naziv</th>
-        <th>Kolicina</th>
-        <th>Boja</th>
-        <th>Hitno?</th>
+        <th>Broj dresa</th>
+        <th>Ime</th>
+        <th>Prezime</th>
+        <th>Pozicija</th>
+        <th>Reprezentativac?</th>
     </tr>
-    @foreach (var porudzbina in Model)
+    @foreach (var igrac in Model)
     {
         <tr>
-            <td>@porudzbina.Id</td>
-            <td>@porudzbina.Naziv</td>
-            <td>@porudzbina.Kolicina</td>
-            <td>@porudzbina.Boja</td>
-            <td>@(porudzbina.Hitno ? "Da" : "Ne")</td>
+            <td>@igrac.BrojDresa</td>
+            <td>@igrac.Ime</td>
+            <td>@igrac.Prezime</td>
+            <td>@igrac.Pozicija</td>
+            <td>@(igrac.Reprezentativac ? "Da" : "Ne")</td>
         </tr>
     }
 </table>
@@ -278,15 +278,15 @@ namespace SOV2
             RouteConfig.RegisterRoutes(RouteTable.Routes);
  
  
-            // Inicijalna lista porudzbina (test podaci sa Slike 2)
-            List<Porudzbina> porudzbine = new List<Porudzbina>
+            // Inicijalna lista igraca (test podaci sa Slike 2)
+            List<Igrac> igraci = new List<Igrac>
             {
-                new Porudzbina("1", "Ruza", "50", BojaCveta.Crvena, true),
-                new Porudzbina("2", "Ljiljan", "30", BojaCveta.Bela, false),
-                new Porudzbina("3", "Lala", "20", BojaCveta.Zuta, false)
+                new Igrac("Petar", "Petrovic", "5", Pozicija.Bek, false),
+                new Igrac("Ana", "Anic", "12", Pozicija.Centar, false),
+                new Igrac("Marko", "Markovic", "18", Pozicija.Krilo, true)
             };
  
-            HttpContext.Current.Application["porudzbine"] = porudzbine;
+            HttpContext.Current.Application["igraci"] = igraci;
         }
     }
 }
@@ -304,36 +304,34 @@ NAPOMENE:
 2. Layout - ne koristi se _Layout.cshtml jer projekat je kreiran kao Empty + MVC
    pa Shared folder ne postoji. Stranice su ciste bez layouta.
  
-3. Test podaci (Ruza / Ljiljan / Lala) ucitavaju se automatski pri pokretanju
-   aplikacije iz Global.asax.cs - tako da odmah kad odes na spisak vec ces
-   videti 3 porudzbine.
+3. Test podaci (Petar Petrovic / Ana Anic / Marko Markovic) ucitavaju se
+   automatski pri pokretanju aplikacije iz Global.asax.cs - tako da odmah
+   kad odes na spisak vec ces videti 3 igraca.
  
 4. Tok aplikacije:
    - Otvara se Index.cshtml (forma za unos + pretraga)
    - Klik na "Dodaj" -> POST na /Home/Dodaj
-     * Ako Id vec postoji -> ostaje na Index sa porukom "Porudzbina sa unetim
-       id vec postoji!" (Slika 3)
-     * Ako Id ne postoji -> RedirectToAction na Spisak (Slika 2)
-   - Klik na "Trazi" -> GET na /Home/Pretrazi?naziv=X
-     * Vraca View "Spisak" sa porudzbinama kod kojih je naziv JEDNAK unetoj
-       vrednosti (exact match - npr. "Ruza" pronalazi samo "Ruza", ne i "Ruzica")
+     * Ako broj dresa vec postoji -> ostaje na Index sa porukom "Uneti broj
+       dresa nije jedinstven!" (Slika 3)
+     * Ako broj dresa ne postoji -> RedirectToAction na Spisak (Slika 2)
+   - Klik na "Trazi" -> GET na /Home/Pretrazi?prezime=X
+     * Vraca View "Spisak" sa igracima kod kojih prezime SADRZI unetu vrednost
    - Klik na "Nazad" na spisku -> vraca na Index.cshtml
  
-5. Validacija - tekst poruke "Porudzbina sa unetim id vec postoji!" je tacno
+5. Validacija - tekst poruke "Uneti broj dresa nije jedinstven!" je tacno
    onako kako je trazeno na Slici 3.
  
-6. Checkbox za Hitno:
+6. Checkbox za Reprezentativac:
    - Kada je cekiran, salje vrednost "true" -> model binding automatski setuje
      bool na true.
    - Kada nije cekiran, checkbox ne salje nista -> bool ostaje default false.
    - U tabeli se prikazuje kao "Da" / "Ne" preko ternary operatora.
  
-7. Pretraga po nazivu radi po EXACT MATCH-u (Equals), kako je trazeno u zadatku:
-   "prikazuju se iskljucivo porudzbine kojima se porucuje cvece ciji naziv je
-   jednak unetom nazivu".
+7. Pretraga po prezimenu radi po SUBSTRING-u (Contains), case-insensitive,
+   sto znaci da "ovic" pronalazi i "Petrovic" i "Markovic".
  
 8. Sva polja se salju kao stringovi/enumi/bool - automatic model binding ce
-   da popuni Porudzbina objekat.
+   da popuni Igrac objekat.
  
  
  

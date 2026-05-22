@@ -6,18 +6,7 @@ FAJL: Views/Home/Index.cshtml
 @{
     ViewBag.Title = "Grupa 15B";
 }
- 
-<h1 style="text-align:center;">Grupa 15B</h1>
- 
-<p>
-    Kreirati ASP.NET MVC aplikaciju koja vodi evidenciju igrača u košarkaškom timu.
-    Kao klijentsku aplikaciju koristiti veb pretraživač (npr. Google Chrome).
-    Prilikom unosa novog igrača korisnik unosi ime, prezime, broj dresa, poziciju
-    i da li je reprezentativac. Pozicija igrača može imati jednu od sledećih
-    vrednosti: <b>Centar</b>, <b>Krilo</b> i <b>Bek</b>. Klijent na server šalje
-    parametre iz forme za unos (Slika 1):
-</p>
- 
+
 @if (ViewBag.Greska != null)
 {
     <h2 style="color:red; text-align:center;">@ViewBag.Greska</h2>

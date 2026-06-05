@@ -1,66 +1,190 @@
-=====================
-FAJL: Views/Home/Index.cshtml
-====================
-@using SOV2.Models
- 
-@{
-    ViewBag.Title = "Grupa 15B";
-}
+==========================================================================
+ SABLON ZA KOLOKVIJUM / PROJEKAT (dCom - Modbus)
+==========================================================================
 
-@if (ViewBag.Greska != null)
-{
-    <h2 style="color:red; text-align:center;">@ViewBag.Greska</h2>
-}
- 
-<h3>Unos igraca</h3>
- 
-<form method="post" action="~/Home/Dodaj">
-    <table>
-        <tr>
-            <td>Ime:</td>
-            <td><input type="text" name="Ime" /></td>
-        </tr>
-        <tr>
-            <td>Prezime:</td>
-            <td><input type="text" name="Prezime" /></td>
-        </tr>
-        <tr>
-            <td>Broj dresa:</td>
-            <td><input type="text" name="BrojDresa" /></td>
-        </tr>
-        <tr>
-            <td>Pozicija:</td>
-            <td>
-                <select name="Pozicija">
-                    @foreach (var p in Enum.GetValues(typeof(Pozicija)))
-                    {
-                        <option value="@p">@p</option>
-                    }
-                </select>
-            </td>
-        </tr>
-        <tr>
-            <td>Da li je reprezentativac?</td>
-            <td><input type="checkbox" name="Reprezentativac" value="true" /></td>
-        </tr>
-        <tr>
-            <td colspan="2">
-                <input type="submit" value="Dodaj" />
-            </td>
-        </tr>
-    </table>
-</form>
- 
-<br />
- 
-<h3>Pretraga:</h3>
- 
-<form method="get" action="~/Home/Pretrazi">
-    <table>
-        <tr>
-            <td>Prezime:</td>
-            <td><input type="text" name="prezime" /></td>
-            <td><input type="submit" value="Trazi" /></td>
-        </tr>
-    </table>
-</form>
+ UKUPNO MENJANO 8 FAJLOVA. Dele se u dve grupe:
+
+   [SABLONSKI]  = skoro uvek ISTO za svaki zadatak (copy-paste, samo
+                  prepises gotov obrazac iz proslog resenja)
+   [PO ZADATKU] = sustina zadatka, menja se svaki put prema tekstu
+
+ Logika je uvek ista: u RtuCfg.txt se definisu tacke (registri), okvir
+ (EGU konverzija + alarmi + upis) je sablonski, a konkretna automatika
+ (pravila, adrese, formule) je ono sto je specificno za zadatak.
+
+==========================================================================
+ 1) ProcessingModule/EGUConverter.cs                         [SABLONSKI]
+==========================================================================
+ -> UVEK ISTO. Samo prekopiraj. Dve metode, vrati prave formule
+    umesto "return rawValue;" / "return (ushort)eguValue;".
+
+   ConvertToEGU(scalingFactor, deviation, rawValue):
+        return scalingFactor * rawValue + deviation;
+
+   ConvertToRaw(scalingFactor, deviation, eguValue):
+        if (scalingFactor == 0) return (ushort)eguValue;
+        return (ushort)((eguValue - deviation) / scalingFactor);
+
+   Komentar: ovo je inverzna funkcija. EGU = realna (inzenjerska)
+   vrednost, raw = ono sto ide na Modbus registar. Nikad se ne menja.
+
+==========================================================================
+ 2) ProcessingModule/AlarmProcessor.cs                       [SABLONSKI]
+==========================================================================
+ -> UVEK ISTO (eventualno se doda jos koji tip alarma po zadatku).
+
+   GetAlarmForAnalogPoint(eguValue, configItem):
+        if (eguValue > configItem.HighLimit) return AlarmType.HIGH_ALARM;
+        if (eguValue < configItem.LowLimit)  return AlarmType.LOW_ALARM;
+        return AlarmType.NO_ALARM;
+
+   GetAlarmForDigitalPoint(state, configItem):
+        if (state == configItem.AbnormalValue) return AlarmType.ABNORMAL_VALUE;
+        return AlarmType.NO_ALARM;
+
+   Komentar: granice (HighLimit/LowLimit/AbnormalValue) se citaju iz
+   ConfigItem-a, koji ih puni iz RtuCfg.txt (vidi tacku 5).
+
+==========================================================================
+ 3) ProcessingModule/ProcessingManager.cs                    [SABLONSKI]
+==========================================================================
+ -> UVEK ISTO. U metodi za obradu primljene vrednosti povezi
+    konverziju + alarm na tacku.
+
+   Za DIGITALNU tacku (gde je sad prazno):
+        point.Alarm = alarmProcessor.GetAlarmForDigitalPoint(newValue, point.ConfigItem);
+
+   Za ANALOGNU tacku:
+        double eguValue = eguConverter.ConvertToEGU(point.ConfigItem.ScaleFactor,
+                              point.ConfigItem.Deviation, newValue);
+        point.EguValue = eguValue;
+        point.Alarm = alarmProcessor.GetAlarmForAnalogPoint(eguValue, point.ConfigItem);
+
+   Komentar: ovde se "spaja" sve - raw vrednost sa mreze se prevede u
+   EGU i odredi alarm. Sablonski, samo dopunis dve rupe.
+
+==========================================================================
+ 4) dCom/ViewModel/PointViewModels/AnalogOutput.cs           [SABLONSKI]
+==========================================================================
+ -> UVEK ISTO. Pri upisu analognog izlaza prvo prebaci EGU -> raw.
+
+   Dodaj na vrh:   using ProcessingModule;
+   Polje:          private EGUConverter eguConverter = new EGUConverter();
+
+   U metodi za upis (umesto da salje (int)CommandedValue):
+        ushort rawValue = eguConverter.ConvertToRaw(ConfigItem.ScaleFactor,
+                              ConfigItem.Deviation, CommandedValue);
+        this.processingManager.ExecuteWriteCommand(ConfigItem,
+            configuration.GetTransactionId(), configuration.UnitAddress,
+            address, rawValue);
+
+   Komentar: korisnik unosi EGU vrednost, na registar mora ici raw.
+
+==========================================================================
+ 5) dCom/Configuration/ConfigItem.cs                  [SABLONSKI okvir,
+                                                       PO ZADATKU indeksi]
+==========================================================================
+ -> Citanje dodatnih parametara iz reda RtuCfg.txt. Obrazac je uvek isti,
+    menjaju se samo REDNI BROJEVI kolona (configurationParameters[i])
+    prema tome kako je definisan format reda u konkretnom RtuCfg.txt.
+
+   Obrazac (na kraju konstruktora):
+        ScaleFactor = 1; Deviation = 0;
+        bool isAnalog = RegistryType == PointType.ANALOG_INPUT
+                     || RegistryType == PointType.ANALOG_OUTPUT
+                     || RegistryType == PointType.HR_LONG;
+        if (isAnalog) {
+            LowLimit = ...; EGU_Max = ...; HighLimit = double.MaxValue;
+            // citaj ScaleFactor / Deviation / LowLimit / EGU_Max
+            // iz configurationParameters[10..13]  <-- INDEKSI PO ZADATKU
+        } else {
+            AbnormalValue = (ushort)(DefaultValue == 0 ? 1 : 0);
+            // configurationParameters[10] -> AbnormalValue
+        }
+   + pomocna:  private static bool ParseDouble(string, out double)
+               (Double.TryParse sa InvariantCulture)
+
+   Komentar: broj kolona i koja kolona je sta zavisi od formata reda u
+   RtuCfg.txt -> uskladi indekse sa tackom 6.
+
+==========================================================================
+ 6) dCom/RtuCfg.txt                                          [PO ZADATKU]
+==========================================================================
+ -> UVEK RAZLICITO. Ovde definisi sve tacke iz teksta zadatka:
+    tip registra, adresu, default, granice, naziv, scale/deviation...
+
+   Format reda (primer iz G2 - analogni ima vise kolona):
+     HR_INT 1 2000 0 0 100 50 AO @Kapacitet 1 1 0 10 100
+     DO_REG 1 4000 0 0   1  1 DO @Napajanje1 1 0
+   Zaglavlje:
+     STA <id> / TCP <port> / DBC <n>
+
+   Komentar: adrese koje ovde upises MORAJU se poklopiti sa konstantama
+   u AutomationManager-u (tacka 7). Ovo je prvi fajl koji se popunjava.
+
+==========================================================================
+ 7) ProcessingModule/AutomationManager.cs                    [PO ZADATKU]
+==========================================================================
+ -> SUSTINA ZADATKA. Petlja automatike u AutomationWorker_DoWork().
+    Logika (pravila, formule, koje adrese, koliko se menja) se pise
+    iskljucivo prema tekstu zadatka. Okvir oko nje je sablonski:
+
+   SABLONSKI deo (uvek isti kostur):
+     using System.Collections.Generic;
+     private EGUConverter eguConverter = new EGUConverter();
+     private const ushort X_ADDRESS = ....;   // konstante adresa PO ZADATKU
+     while (!disposedValue) {
+         automationTrigger.WaitOne();
+         // 1) pokupi IConfigItem preko GetConfigItem(adresa)
+         // 2) pokupi tacke preko GetPoint(PointType, adresa) as IAnalog/IDigitalPoint
+         // 3) null-provere -> continue
+         // 4) ... LOGIKA PO ZADATKU ...
+         // 5) processingManager.ExecuteWriteCommand(cfg, GetTransactionId(),
+         //        UnitAddress, adresa, rawVrednost)
+         Thread.Sleep(delayBetweenCommands);
+     }
+     // pomocne metode (uvek iste):
+     private IConfigItem GetConfigItem(ushort startAddress) { ... }
+     private IPoint GetPoint(PointType type, ushort address) { ... }
+
+   PO ZADATKU: koje adrese, koliko se kapacitet menja po stanju izlaza
+   (delta), granice (LowAlarm/EGU_Max) i sta se gasi/pali. Sve to citaj
+   iz teksta. Za analogni upis koristi eguConverter.ConvertToRaw.
+
+   Komentar: ovo je glavni deo gde se "dobijaju poeni" - sve ostalo je
+   infrastruktura.
+
+==========================================================================
+ 8) dCom/ViewModel/PointViewModels/DigitalOutput.cs   [PO ZADATKU,
+                                                       cest dodatak]
+==========================================================================
+ -> Validacija/odbijanje komande na digitalnom izlazu po pravilu iz
+    zadatka (npr. "ne dozvoli ukljucivanje ako kapacitet nije iznad
+    LowAlarm"). Ne mora postojati u svakom zadatku.
+
+   Obrazac (u metodi za upis, pre ExecuteWriteCommand):
+     if (<uslov iz zadatka>) {
+         this.stateUpdater.LogMessage("Komanda odbijena: ...");
+         return;
+     }
+   + pomocna metoda koja proverava uslov (npr. IsCapacityAboveLowAlarm):
+     - uzmi IStorage iz stateUpdater (as IStorage)
+     - nadji odgovarajuci IConfigItem (po RegistryType/adresi)
+     - storage.GetPoints(...) -> IAnalogPoint -> uporedi EguValue sa granicom
+
+   Komentar: opseg adresa (npr. 5000..5004) i uslov su PO ZADATKU.
+
+==========================================================================
+ REDOSLED RADA (preporuka):
+   1. RtuCfg.txt            (definisi tacke prema zadatku)
+   2. ConfigItem.cs         (uskladi citanje kolona sa RtuCfg)
+   3. EGUConverter.cs       (copy-paste formule)
+   4. AlarmProcessor.cs     (copy-paste alarme)
+   5. ProcessingManager.cs  (copy-paste povezivanje)
+   6. AnalogOutput.cs       (copy-paste EGU->raw pri upisu)
+   7. AutomationManager.cs  (SRZ ZADATKA - logika automatike)
+   8. DigitalOutput.cs      (ako zadatak trazi validaciju komande)
+
+ NAPOMENA: fajlovi pod bin/ obj/ .vs/ se NE diraju (generisani su
+ pri build-u). BOM/whitespace razlike nisu bitne.
+==========================================================================

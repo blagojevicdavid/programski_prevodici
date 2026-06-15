@@ -1,190 +1,139 @@
-==========================================================================
- SABLON ZA KOLOKVIJUM / PROJEKAT (dCom - Modbus)
-==========================================================================
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
- UKUPNO MENJANO 8 FAJLOVA. Dele se u dve grupe:
+typedef struct sat_st {
+    char model[21];
+    char brend[16];
+    float cena;
+    int vodootpornost_m;
+    struct sat_st *sledeci;
+} sat_st;
 
-   [SABLONSKI]  = skoro uvek ISTO za svaki zadatak (copy-paste, samo
-                  prepises gotov obrazac iz proslog resenja)
-   [PO ZADATKU] = sustina zadatka, menja se svaki put prema tekstu
+sat_st* dodaj_sortirano(sat_st *glava, sat_st *novi) {
+    if (glava == NULL || novi->cena <= glava->cena) {
+        novi->sledeci = glava;
+        return novi;
+    }
+    sat_st *tek = glava;
+    while (tek->sledeci != NULL && tek->sledeci->cena < novi->cena) {
+        tek = tek->sledeci;
+    }
+    novi->sledeci = tek->sledeci;
+    tek->sledeci = novi;
+    return glava;
+}
 
- Logika je uvek ista: u RtuCfg.txt se definisu tacke (registri), okvir
- (EGU konverzija + alarmi + upis) je sablonski, a konkretna automatika
- (pravila, adrese, formule) je ono sto je specificno za zadatak.
+sat_st* ucitaj_listu(const char *ime_datoteke) {
+    FILE *f = fopen(ime_datoteke, "r");
+    if (f == NULL) return NULL;
 
-==========================================================================
- 1) ProcessingModule/EGUConverter.cs                         [SABLONSKI]
-==========================================================================
- -> UVEK ISTO. Samo prekopiraj. Dve metode, vrati prave formule
-    umesto "return rawValue;" / "return (ushort)eguValue;".
+    sat_st *glava = NULL;
+    char model[21], brend[16];
+    float cena;
+    int vodootpornost;
 
-   ConvertToEGU(scalingFactor, deviation, rawValue):
-        return scalingFactor * rawValue + deviation;
-
-   ConvertToRaw(scalingFactor, deviation, eguValue):
-        if (scalingFactor == 0) return (ushort)eguValue;
-        return (ushort)((eguValue - deviation) / scalingFactor);
-
-   Komentar: ovo je inverzna funkcija. EGU = realna (inzenjerska)
-   vrednost, raw = ono sto ide na Modbus registar. Nikad se ne menja.
-
-==========================================================================
- 2) ProcessingModule/AlarmProcessor.cs                       [SABLONSKI]
-==========================================================================
- -> UVEK ISTO (eventualno se doda jos koji tip alarma po zadatku).
-
-   GetAlarmForAnalogPoint(eguValue, configItem):
-        if (eguValue > configItem.HighLimit) return AlarmType.HIGH_ALARM;
-        if (eguValue < configItem.LowLimit)  return AlarmType.LOW_ALARM;
-        return AlarmType.NO_ALARM;
-
-   GetAlarmForDigitalPoint(state, configItem):
-        if (state == configItem.AbnormalValue) return AlarmType.ABNORMAL_VALUE;
-        return AlarmType.NO_ALARM;
-
-   Komentar: granice (HighLimit/LowLimit/AbnormalValue) se citaju iz
-   ConfigItem-a, koji ih puni iz RtuCfg.txt (vidi tacku 5).
-
-==========================================================================
- 3) ProcessingModule/ProcessingManager.cs                    [SABLONSKI]
-==========================================================================
- -> UVEK ISTO. U metodi za obradu primljene vrednosti povezi
-    konverziju + alarm na tacku.
-
-   Za DIGITALNU tacku (gde je sad prazno):
-        point.Alarm = alarmProcessor.GetAlarmForDigitalPoint(newValue, point.ConfigItem);
-
-   Za ANALOGNU tacku:
-        double eguValue = eguConverter.ConvertToEGU(point.ConfigItem.ScaleFactor,
-                              point.ConfigItem.Deviation, newValue);
-        point.EguValue = eguValue;
-        point.Alarm = alarmProcessor.GetAlarmForAnalogPoint(eguValue, point.ConfigItem);
-
-   Komentar: ovde se "spaja" sve - raw vrednost sa mreze se prevede u
-   EGU i odredi alarm. Sablonski, samo dopunis dve rupe.
-
-==========================================================================
- 4) dCom/ViewModel/PointViewModels/AnalogOutput.cs           [SABLONSKI]
-==========================================================================
- -> UVEK ISTO. Pri upisu analognog izlaza prvo prebaci EGU -> raw.
-
-   Dodaj na vrh:   using ProcessingModule;
-   Polje:          private EGUConverter eguConverter = new EGUConverter();
-
-   U metodi za upis (umesto da salje (int)CommandedValue):
-        ushort rawValue = eguConverter.ConvertToRaw(ConfigItem.ScaleFactor,
-                              ConfigItem.Deviation, CommandedValue);
-        this.processingManager.ExecuteWriteCommand(ConfigItem,
-            configuration.GetTransactionId(), configuration.UnitAddress,
-            address, rawValue);
-
-   Komentar: korisnik unosi EGU vrednost, na registar mora ici raw.
-
-==========================================================================
- 5) dCom/Configuration/ConfigItem.cs                  [SABLONSKI okvir,
-                                                       PO ZADATKU indeksi]
-==========================================================================
- -> Citanje dodatnih parametara iz reda RtuCfg.txt. Obrazac je uvek isti,
-    menjaju se samo REDNI BROJEVI kolona (configurationParameters[i])
-    prema tome kako je definisan format reda u konkretnom RtuCfg.txt.
-
-   Obrazac (na kraju konstruktora):
-        ScaleFactor = 1; Deviation = 0;
-        bool isAnalog = RegistryType == PointType.ANALOG_INPUT
-                     || RegistryType == PointType.ANALOG_OUTPUT
-                     || RegistryType == PointType.HR_LONG;
-        if (isAnalog) {
-            LowLimit = ...; EGU_Max = ...; HighLimit = double.MaxValue;
-            // citaj ScaleFactor / Deviation / LowLimit / EGU_Max
-            // iz configurationParameters[10..13]  <-- INDEKSI PO ZADATKU
-        } else {
-            AbnormalValue = (ushort)(DefaultValue == 0 ? 1 : 0);
-            // configurationParameters[10] -> AbnormalValue
+    while (fscanf(f, "%20s %15s %f %d", model, brend, &cena, &vodootpornost) == 4) {
+        sat_st *novi = (sat_st*)malloc(sizeof(sat_st));
+        if (novi == NULL) {
+            fclose(f);
+            // oslobodi listu
+            while (glava) { sat_st *t = glava->sledeci; free(glava); glava = t; }
+            return (sat_st*)-1; // signal za grešku memorije
         }
-   + pomocna:  private static bool ParseDouble(string, out double)
-               (Double.TryParse sa InvariantCulture)
+        strcpy(novi->model, model);
+        strcpy(novi->brend, brend);
+        novi->cena = cena;
+        novi->vodootpornost_m = vodootpornost;
+        novi->sledeci = NULL;
+        glava = dodaj_sortirano(glava, novi);
+    }
 
-   Komentar: broj kolona i koja kolona je sta zavisi od formata reda u
-   RtuCfg.txt -> uskladi indekse sa tackom 6.
+    fclose(f);
+    return glava;
+}
 
-==========================================================================
- 6) dCom/RtuCfg.txt                                          [PO ZADATKU]
-==========================================================================
- -> UVEK RAZLICITO. Ovde definisi sve tacke iz teksta zadatka:
-    tip registra, adresu, default, granice, naziv, scale/deviation...
+void oslobodi_listu(sat_st *glava) {
+    while (glava) {
+        sat_st *t = glava->sledeci;
+        free(glava);
+        glava = t;
+    }
+}
 
-   Format reda (primer iz G2 - analogni ima vise kolona):
-     HR_INT 1 2000 0 0 100 50 AO @Kapacitet 1 1 0 10 100
-     DO_REG 1 4000 0 0   1  1 DO @Napajanje1 1 0
-   Zaglavlje:
-     STA <id> / TCP <port> / DBC <n>
+int main(int argc, char *argv[]) {
+    if (argc != 6) {
+        exit(3);
+    }
 
-   Komentar: adrese koje ovde upises MORAJU se poklopiti sa konstantama
-   u AutomationManager-u (tacka 7). Ovo je prvi fajl koji se popunjava.
+    const char *ulaz = argv[1];
+    const char *izlaz = argv[2];
+    const char *brend = argv[3];
+    int broj_komada = atoi(argv[4]);
+    float budzet = atof(argv[5]);
 
-==========================================================================
- 7) ProcessingModule/AutomationManager.cs                    [PO ZADATKU]
-==========================================================================
- -> SUSTINA ZADATKA. Petlja automatike u AutomationWorker_DoWork().
-    Logika (pravila, formule, koje adrese, koliko se menja) se pise
-    iskljucivo prema tekstu zadatka. Okvir oko nje je sablonski:
+    sat_st *glava = ucitaj_listu(ulaz);
+    if (glava == (sat_st*)-1) {
+        exit(4);
+    }
+    if (glava == NULL) {
+        exit(1);
+    }
 
-   SABLONSKI deo (uvek isti kostur):
-     using System.Collections.Generic;
-     private EGUConverter eguConverter = new EGUConverter();
-     private const ushort X_ADDRESS = ....;   // konstante adresa PO ZADATKU
-     while (!disposedValue) {
-         automationTrigger.WaitOne();
-         // 1) pokupi IConfigItem preko GetConfigItem(adresa)
-         // 2) pokupi tacke preko GetPoint(PointType, adresa) as IAnalog/IDigitalPoint
-         // 3) null-provere -> continue
-         // 4) ... LOGIKA PO ZADATKU ...
-         // 5) processingManager.ExecuteWriteCommand(cfg, GetTransactionId(),
-         //        UnitAddress, adresa, rawVrednost)
-         Thread.Sleep(delayBetweenCommands);
-     }
-     // pomocne metode (uvek iste):
-     private IConfigItem GetConfigItem(ushort startAddress) { ... }
-     private IPoint GetPoint(PointType type, ushort address) { ... }
+    FILE *out = fopen(izlaz, "w");
+    if (out == NULL) {
+        oslobodi_listu(glava);
+        exit(2);
+    }
 
-   PO ZADATKU: koje adrese, koliko se kapacitet menja po stanju izlaza
-   (delta), granice (LowAlarm/EGU_Max) i sta se gasi/pali. Sve to citaj
-   iz teksta. Za analogni upis koristi eguConverter.ConvertToRaw.
+    // Pronađi najbolji sat brenda u okviru budžeta
+    sat_st *najbolji = NULL;
+    float min_razlika = -1;
+    sat_st *tek = glava;
 
-   Komentar: ovo je glavni deo gde se "dobijaju poeni" - sve ostalo je
-   infrastruktura.
+    while (tek != NULL) {
+        if (strcmp(tek->brend, brend) == 0) {
+            float ukupno = tek->cena * broj_komada;
+            if (ukupno <= budzet) {
+                float razlika = budzet - ukupno;
+                if (min_razlika < 0 || razlika < min_razlika) {
+                    min_razlika = razlika;
+                    najbolji = tek;
+                }
+            }
+        }
+        tek = tek->sledeci;
+    }
 
-==========================================================================
- 8) dCom/ViewModel/PointViewModels/DigitalOutput.cs   [PO ZADATKU,
-                                                       cest dodatak]
-==========================================================================
- -> Validacija/odbijanje komande na digitalnom izlazu po pravilu iz
-    zadatka (npr. "ne dozvoli ukljucivanje ako kapacitet nije iznad
-    LowAlarm"). Ne mora postojati u svakom zadatku.
+    fprintf(out, "Najbolji sat brenda %s:\n", brend);
+    if (najbolji == NULL) {
+        fprintf(out, "Nema odgovarajuceg sata.\n");
+    } else {
+        fprintf(out, "%s %s %.1f %d\n", najbolji->model, najbolji->brend,
+                najbolji->cena, najbolji->vodootpornost_m);
+    }
 
-   Obrazac (u metodi za upis, pre ExecuteWriteCommand):
-     if (<uslov iz zadatka>) {
-         this.stateUpdater.LogMessage("Komanda odbijena: ...");
-         return;
-     }
-   + pomocna metoda koja proverava uslov (npr. IsCapacityAboveLowAlarm):
-     - uzmi IStorage iz stateUpdater (as IStorage)
-     - nadji odgovarajuci IConfigItem (po RegistryType/adresi)
-     - storage.GetPoints(...) -> IAnalogPoint -> uporedi EguValue sa granicom
+    // Vodootpornost najboljeg (ili 0 ako nema)
+    int vodo_granica = (najbolji != NULL) ? najbolji->vodootpornost_m : 0;
 
-   Komentar: opseg adresa (npr. 5000..5004) i uslov su PO ZADATKU.
+    fprintf(out, "\nSatovi brenda '%s' sa vodootpornoscu od najmanje %dm:\n", brend, vodo_granica);
 
-==========================================================================
- REDOSLED RADA (preporuka):
-   1. RtuCfg.txt            (definisi tacke prema zadatku)
-   2. ConfigItem.cs         (uskladi citanje kolona sa RtuCfg)
-   3. EGUConverter.cs       (copy-paste formule)
-   4. AlarmProcessor.cs     (copy-paste alarme)
-   5. ProcessingManager.cs  (copy-paste povezivanje)
-   6. AnalogOutput.cs       (copy-paste EGU->raw pri upisu)
-   7. AutomationManager.cs  (SRZ ZADATKA - logika automatike)
-   8. DigitalOutput.cs      (ako zadatak trazi validaciju komande)
+    int nadjen = 0;
+    tek = glava;
+    while (tek != NULL) {
+        if (strcmp(tek->brend, brend) == 0 && tek->vodootpornost_m >= vodo_granica) {
+            fprintf(out, "%s %s %.1f %d\n", tek->model, tek->brend,
+                    tek->cena, tek->vodootpornost_m);
+            nadjen = 1;
+        }
+        tek = tek->sledeci;
+    }
 
- NAPOMENA: fajlovi pod bin/ obj/ .vs/ se NE diraju (generisani su
- pri build-u). BOM/whitespace razlike nisu bitne.
-==========================================================================
+    if (!nadjen) {
+        fprintf(out, "Nema\n");
+    }
+
+    fclose(out);
+    oslobodi_listu(glava);
+    return 0;
+}

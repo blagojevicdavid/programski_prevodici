@@ -37,9 +37,8 @@ sat_st* ucitaj_listu(const char *ime_datoteke) {
         sat_st *novi = (sat_st*)malloc(sizeof(sat_st));
         if (novi == NULL) {
             fclose(f);
-            // oslobodi listu
             while (glava) { sat_st *t = glava->sledeci; free(glava); glava = t; }
-            return (sat_st*)-1; // signal za grešku memorije
+            return (sat_st*)-1;
         }
         strcpy(novi->model, model);
         strcpy(novi->brend, brend);
@@ -62,15 +61,16 @@ void oslobodi_listu(sat_st *glava) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 6) {
+    if (argc != 7) {
         exit(3);
     }
 
-    const char *ulaz = argv[1];
-    const char *izlaz = argv[2];
-    const char *brend = argv[3];
-    int broj_komada = atoi(argv[4]);
-    float budzet = atof(argv[5]);
+    const char *ulaz     = argv[1];
+    const char *izlaz    = argv[2];
+    const char *brend    = argv[3];
+    int   broj_komada    = atoi(argv[4]);
+    float budzet         = atof(argv[5]);
+    int   vodo_min       = atoi(argv[6]);
 
     sat_st *glava = ucitaj_listu(ulaz);
     if (glava == (sat_st*)-1) {
@@ -113,15 +113,13 @@ int main(int argc, char *argv[]) {
                 najbolji->cena, najbolji->vodootpornost_m);
     }
 
-    // Vodootpornost najboljeg (ili 0 ako nema)
-    int vodo_granica = (najbolji != NULL) ? najbolji->vodootpornost_m : 0;
-
-    fprintf(out, "\nSatovi brenda '%s' sa vodootpornoscu od najmanje %dm:\n", brend, vodo_granica);
+    // Ispiši sve satove brenda sa vodootpornošću >= vodo_min
+    fprintf(out, "\nSatovi brenda '%s' sa vodootpornoscu od najmanje %dm:\n", brend, vodo_min);
 
     int nadjen = 0;
     tek = glava;
     while (tek != NULL) {
-        if (strcmp(tek->brend, brend) == 0 && tek->vodootpornost_m >= vodo_granica) {
+        if (strcmp(tek->brend, brend) == 0 && tek->vodootpornost_m >= vodo_min) {
             fprintf(out, "%s %s %.1f %d\n", tek->model, tek->brend,
                     tek->cena, tek->vodootpornost_m);
             nadjen = 1;

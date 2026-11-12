@@ -1,137 +1,34 @@
-#include <stdio.h>aaaaaaaa
-#include <stdlib.h>
-#include <string.h>
+-- Zadatak 1: nepokretnosti u Petrovaradinu sortirane rastuće po kvadraturi
+SELECT IDN, ULICA, UL_BR FROM Nepokretnost WHERE OPSTINA = 'Petrovaradin' ORDER BY KVD ASC;
 
-typedef struct sat_st {
-    char model[21];
-    char brend[16];
-    float cena;
-    int vodootpornost_m;
-    struct sat_st *sledeci;
-} sat_st;
+-- Zadatak 2: nepokretnosti sa kvadraturom između 50 i 100 (uključujući granice)
+SELECT IDN, KVD, ULICA, UL_BR FROM Nepokretnost WHERE KVD BETWEEN 50 AND 100;
 
-sat_st* dodaj_sortirano(sat_st *glava, sat_st *novi) {
-    if (glava == NULL || novi->cena <= glava->cena) {
-        novi->sledeci = glava;
-        return novi;
-    }
-    sat_st *tek = glava;
-    while (tek->sledeci != NULL && tek->sledeci->cena < novi->cena) {
-        tek = tek->sledeci;
-    }
-    novi->sledeci = tek->sledeci;
-    tek->sledeci = novi;
-    return glava;
-}
+-- Zadatak 3: dodavanje kolona DATPOCIZG i DATZAVIZG u tabelu Nepokretnost
+ALTER TABLE Nepokretnost ADD(DATPOCIZG date, DATZAVIZG date);
 
-sat_st* ucitaj_listu(const char *ime_datoteke) {
-    FILE *f = fopen(ime_datoteke, "r");
-    if (f == NULL) return NULL;
+-- Zadatak 4: lica sa saldom i kategorijom zaduženosti
+-- Pretpostavka: saldo tačno -15000 spada u 'Umereno zaduzena' (saldo "do -15.000")
+SELECT l.IDL, l.IMEL, l.PRZL, pk.SALDO, CASE WHEN pk.SALDO >= 0 THEN 'Nezaduzena' WHEN pk.SALDO < 0 AND pk.SALDO >= -15000 THEN 'Umereno zaduzena' ELSE 'Zaduzena' END AS zaduzenost FROM Lice l INNER JOIN PoreskaKartica pk ON l.IDL = pk.IDL;
 
-    sat_st *glava = NULL;
-    char model[21], brend[16];
-    float cena;
-    int vodootpornost;
+-- Zadatak 5: poreske kartice pravnih lica sa dugovanjem i njihove nepokretnosti
+SELECT pk.IDK, l.IMEL, l.PRZL, n.KVD, n.ULICA, vn.NAZIVVN FROM PoreskaKartica pk INNER JOIN Lice l ON pk.IDL = l.IDL INNER JOIN Nepokretnost n ON l.IDL = n.IDL INNER JOIN VrstaNep vn ON n.IDVN = vn.IDVN WHERE l.VRSTAL = 'PRAVNO' AND pk.DUG > 0;
 
-    while (fscanf(f, "%20s %15s %f %d", model, brend, &cena, &vodootpornost) == 4) {
-        sat_st *novi = (sat_st*)malloc(sizeof(sat_st));
-        if (novi == NULL) {
-            fclose(f);
-            while (glava) { sat_st *t = glava->sledeci; free(glava); glava = t; }
-            return (sat_st*)-1;
-        }
-        strcpy(novi->model, model);
-        strcpy(novi->brend, brend);
-        novi->cena = cena;
-        novi->vodootpornost_m = vodootpornost;
-        novi->sledeci = NULL;
-        glava = dodaj_sortirano(glava, novi);
-    }
+-- Zadatak 6: lica koja imaju Stan, a nemaju Kucu
+SELECT IDL, IMEL, PRZL FROM Lice WHERE IDL IN (SELECT n.IDL FROM Nepokretnost n INNER JOIN VrstaNep vn ON n.IDVN = vn.IDVN WHERE vn.NAZIVVN = 'Stan') AND IDL NOT IN (SELECT n.IDL FROM Nepokretnost n INNER JOIN VrstaNep vn ON n.IDVN = vn.IDVN WHERE vn.NAZIVVN = 'Kuca');
 
-    fclose(f);
-    return glava;
-}
+-- Zadatak 7: nepokretnosti sa kvadraturom manjom od prosečne za svoju vrstu
+-- Pretpostavka: kolona BROJ iz postavke je u šemi UL_BR
+SELECT n.IDN, n.KVD, n.ULICA, n.UL_BR, vn.IDVN, vn.NAZIVVN FROM Nepokretnost n INNER JOIN VrstaNep vn ON n.IDVN = vn.IDVN WHERE n.KVD < (SELECT AVG(n1.KVD) FROM Nepokretnost n1 WHERE n1.IDVN = n.IDVN);
 
-void oslobodi_listu(sat_st *glava) {
-    while (glava) {
-        sat_st *t = glava->sledeci;
-        free(glava);
-        glava = t;
-    }
-}
+-- Zadatak 8: povećanje kamate za 5% na karticama sa dugom
+UPDATE PoreskaKartica SET KAMATA = KAMATA*1.05 WHERE DUG > 0;
 
-int main(int argc, char *argv[]) {
-    if (argc != 7) {
-        exit(3);
-    }
+-- Zadatak 9: broj nepokretnosti, broj vrsta, ukupna kvadratura i saldo po licu (analitičke funkcije), ukupna kvadratura < 200
+-- Pretpostavka: svako lice ima jednu poresku karticu; lica bez nepokretnosti ulaze sa kvadraturom 0
+WITH podaci_lica AS (SELECT DISTINCT l.IDL, l.IMEL, l.PRZL, COUNT(n.IDN) OVER (PARTITION BY l.IDL) AS br_nep, COUNT(DISTINCT n.IDVN) OVER (PARTITION BY l.IDL) AS br_vrsta, NVL(SUM(n.KVD) OVER (PARTITION BY l.IDL), 0) AS uk_kvd, pk.SALDO FROM Lice l LEFT OUTER JOIN Nepokretnost n ON l.IDL = n.IDL INNER JOIN PoreskaKartica pk ON l.IDL = pk.IDL) SELECT IMEL, PRZL, br_nep, br_vrsta, uk_kvd, SALDO FROM podaci_lica WHERE uk_kvd < 200;
 
-    const char *ulaz     = argv[1];
-    const char *izlaz    = argv[2];
-    const char *brend    = argv[3];
-    int   broj_komada    = atoi(argv[4]);
-    float budzet         = atof(argv[5]);
-    int   vodo_min       = atoi(argv[6]);
-
-    sat_st *glava = ucitaj_listu(ulaz);
-    if (glava == (sat_st*)-1) {
-        exit(4);
-    }
-    if (glava == NULL) {
-        exit(1);
-    }
-
-    FILE *out = fopen(izlaz, "w");
-    if (out == NULL) {
-        oslobodi_listu(glava);
-        exit(2);
-    }
-
-    // Pronađi najbolji sat brenda u okviru budžeta
-    sat_st *najbolji = NULL;
-    float min_razlika = -1;
-    sat_st *tek = glava;
-
-    while (tek != NULL) {
-        if (strcmp(tek->brend, brend) == 0) {
-            float ukupno = tek->cena * broj_komada;
-            if (ukupno <= budzet) {
-                float razlika = budzet - ukupno;
-                if (min_razlika < 0 || razlika < min_razlika) {
-                    min_razlika = razlika;
-                    najbolji = tek;
-                }
-            }
-        }
-        tek = tek->sledeci;
-    }
-
-    fprintf(out, "Najbolji sat brenda %s:\n", brend);
-    if (najbolji == NULL) {
-        fprintf(out, "Nema odgovarajuceg sata.\n");
-    } else {
-        fprintf(out, "%s %s %.1f %d\n", najbolji->model, najbolji->brend,
-                najbolji->cena, najbolji->vodootpornost_m);
-    }
-
-    // Ispiši sve satove brenda sa vodootpornošću >= vodo_min
-    fprintf(out, "\nSatovi brenda '%s' sa vodootpornoscu od najmanje %dm:\n", brend, vodo_min);
-
-    int nadjen = 0;
-    tek = glava;
-    while (tek != NULL) {
-        if (strcmp(tek->brend, brend) == 0 && tek->vodootpornost_m >= vodo_min) {
-            fprintf(out, "%s %s %.1f %d\n", tek->model, tek->brend,
-                    tek->cena, tek->vodootpornost_m);
-            nadjen = 1;
-        }
-        tek = tek->sledeci;
-    }
-
-    if (!nadjen) {
-        fprintf(out, "Nema\n");
-    }
-
-    fclose(out);
-    oslobodi_listu(glava);
-    return 0;
-}
+-- Zadatak 10: pogled sa ukupnim dugom po grupama vlasnika, zatim prikaz grupa sa dugom većim od prosečnog
+-- Napomena: postavka traži kreiranje pogleda i prikaz, pa su potrebne dve naredbe (CREATE VIEW + SELECT)
+CREATE OR REPLACE VIEW dug_po_grupama (Grupa, UkDug) AS SELECT 'Fizicka lica - Kuca', NVL(SUM(pk.DUG), 0) FROM PoreskaKartica pk WHERE pk.IDL IN (SELECT n.IDL FROM Nepokretnost n INNER JOIN VrstaNep vn ON n.IDVN = vn.IDVN INNER JOIN Lice l ON n.IDL = l.IDL WHERE l.VRSTAL = 'FIZICKO' AND vn.NAZIVVN = 'Kuca') UNION SELECT 'Pravna lica - Poslovni prostor', NVL(SUM(pk.DUG), 0) FROM PoreskaKartica pk WHERE pk.IDL IN (SELECT n.IDL FROM Nepokretnost n INNER JOIN VrstaNep vn ON n.IDVN = vn.IDVN INNER JOIN Lice l ON n.IDL = l.IDL WHERE l.VRSTAL = 'PRAVNO' AND vn.NAZIVVN = 'Poslovni prostor') UNION SELECT 'Fizicka lica bez nepokretnosti', NVL(SUM(pk.DUG), 0) FROM PoreskaKartica pk INNER JOIN Lice l ON pk.IDL = l.IDL WHERE l.VRSTAL = 'FIZICKO' AND l.IDL NOT IN (SELECT IDL FROM Nepokretnost WHERE IDL IS NOT NULL);
+SELECT * FROM dug_po_grupama WHERE UkDug > (SELECT AVG(DUG) FROM PoreskaKartica);

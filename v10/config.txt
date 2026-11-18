@@ -1,48 +1,32 @@
-====================================================================
-KORAK 1 | FAJL: semantic.y | AKCIJA: DODATI
-MJESTO: prva linija fajla, prije %{ 
----------------------------------------------------------------------
-/* IME PREZIME INDEKS */
-=====================================================================
 
 =====================================================================
-KORAK 2 | FAJL: semantic.y | AKCIJA: DODATI
-MJESTO: sekcija deklaracija tokena, odmah ispod %token <i> _RELOP
+KORAK 1 | FAJL: semantic.y | AKCIJA: IZMIJENITI
+MJESTO: sekcija deklaracija tokena, deklaracija _DIRECTION
 ---------------------------------------------------------------------
+STARO:
+%token _DIRECTION
+NOVO:
 %token <i> _DIRECTION
-%token _KRAJ
-%token _POCETAK
-%token _IZVRSI
+
+Ako vec pise %token <i> _DIRECTION, ne mijenjati tu liniju.
 =====================================================================
 
 =====================================================================
-KORAK 3 | FAJL: semantic.l | AKCIJA: DODATI
-MJESTO: sekcija pravila, odmah ispod "return" { return _RETURN; },
-        obavezno prije pravila [a-zA-Z][a-zA-Z0-9]* za _ID
+KORAK 2 | FAJL: semantic.l | AKCIJA: PROVJERITI / IZMIJENITI
+MJESTO: pravila za rasti_rasti i pada_pada, prije pravila za _ID
 ---------------------------------------------------------------------
 "rasti_rasti"        { yylval.i = 1; return _DIRECTION; }
 "pada_pada"          { yylval.i = 0; return _DIRECTION; }
-"kraj"               { return _KRAJ; }
-"pocetak"            { return _POCETAK; }
-"izvrsi"             { return _IZVRSI; }
 =====================================================================
 
 =====================================================================
-KORAK 4 | FAJL: semantic.y | AKCIJA: DODATI
-MJESTO: u pravilu statement, odmah ispod | return_statement
+KORAK 3 | FAJL: semantic.y | AKCIJA: ZAMIJENITI
+MJESTO: cijelo pravilo direction_statement, od direction_statement do njegovog ;
 ---------------------------------------------------------------------
-  | direction_statement
-=====================================================================
+STARO:
+Postojece pravilo direction_statement sa pogresnim $4 i $6.
 
-=====================================================================
-KORAK 5 | FAJL: semantic.y | AKCIJA: DODATI
-MJESTO: u sekciji gramatike, iza cijelog pravila return_statement,
-        a prije drugog %%
----------------------------------------------------------------------
-NAPOMENA: nema direktnog uzora na vjezbama za semanticku vrijednost
-zajednickog tokena smjera; koristen obrazac iz v03 zadatak 5
-(zajednicki token) i v04 (token sa vrijednoscu).
-
+NOVO:
 direction_statement
   : _DIRECTION _ID
       {
@@ -51,11 +35,11 @@ direction_statement
       }
     _KRAJ literal _POCETAK literal
       {
-        if(get_type($4) != get_type($6))
+        if(get_type($5) != get_type($7))
           err("incompatible types in direction statement");
-        if($1 == 1 && atoi(get_name($6)) >= atoi(get_name($4)))
+        if($1 == 1 && atoi(get_name($7)) >= atoi(get_name($5)))
           err("start literal must be less than end literal");
-        if($1 == 0 && atoi(get_name($6)) <= atoi(get_name($4)))
+        if($1 == 0 && atoi(get_name($7)) <= atoi(get_name($5)))
           err("start literal must be greater than end literal");
       }
     _IZVRSI statement
@@ -63,13 +47,10 @@ direction_statement
 =====================================================================
 
 KONTROLNA LISTA
-[x] Komentar sa imenom, prezimenom i indeksom je na prvoj liniji semantic.y.
-[x] _DIRECTION nosi vrijednost 1 za rasti_rasti, 0 za pada_pada.
-[x] Sve nove kljucne rijeci su iznad pravila za _ID u semantic.l.
-[x] direction_statement je ukljucen u statement.
-[x] $1=smjer, $2=id, $4=prvi literal (kraj), $6=drugi literal (pocetak).
-[x] Provjera deklaracije identifikatora je prisutna.
-[x] Tipovi oba literala se porede pomocu get_type.
-[x] rasti_rasti: drugi literal < prvi; pada_pada: drugi literal > prvi.
-[x] defs.h, symtab.c, symtab.h i Makefile nisu mijenjani.
-[ ] Pokrenuti make i make det u okruzenju sa flex i bison.
+[ ] _DIRECTION je deklarisan samo jednom, kao %token <i> _DIRECTION.
+[ ] Oba smjera postavljaju yylval.i u semantic.l.
+[ ] $1=_DIRECTION, $2=_ID, $3=akcija, $4=_KRAJ, $5=literal.
+[ ] $6=_POCETAK, $7=literal, $8=akcija, $9=_IZVRSI, $10=statement.
+[ ] U provjerama tipova i vrijednosti koriste se $5 i $7, ne $4 i $6.
+[ ] direction_statement je ukljucen u statement.
+[ ] Pokrenuti make; rezultat kompajliranja nije ovdje potvrdjen

@@ -1,1 +1,75 @@
-jel stiglo?
+====================================================================
+KORAK 1 | FAJL: semantic.y | AKCIJA: DODATI
+MJESTO: prva linija fajla, prije %{ 
+---------------------------------------------------------------------
+/* IME PREZIME INDEKS */
+=====================================================================
+
+=====================================================================
+KORAK 2 | FAJL: semantic.y | AKCIJA: DODATI
+MJESTO: sekcija deklaracija tokena, odmah ispod %token <i> _RELOP
+---------------------------------------------------------------------
+%token <i> _DIRECTION
+%token _KRAJ
+%token _POCETAK
+%token _IZVRSI
+=====================================================================
+
+=====================================================================
+KORAK 3 | FAJL: semantic.l | AKCIJA: DODATI
+MJESTO: sekcija pravila, odmah ispod "return" { return _RETURN; },
+        obavezno prije pravila [a-zA-Z][a-zA-Z0-9]* za _ID
+---------------------------------------------------------------------
+"rasti_rasti"        { yylval.i = 1; return _DIRECTION; }
+"pada_pada"          { yylval.i = 0; return _DIRECTION; }
+"kraj"               { return _KRAJ; }
+"pocetak"            { return _POCETAK; }
+"izvrsi"             { return _IZVRSI; }
+=====================================================================
+
+=====================================================================
+KORAK 4 | FAJL: semantic.y | AKCIJA: DODATI
+MJESTO: u pravilu statement, odmah ispod | return_statement
+---------------------------------------------------------------------
+  | direction_statement
+=====================================================================
+
+=====================================================================
+KORAK 5 | FAJL: semantic.y | AKCIJA: DODATI
+MJESTO: u sekciji gramatike, iza cijelog pravila return_statement,
+        a prije drugog %%
+---------------------------------------------------------------------
+NAPOMENA: nema direktnog uzora na vjezbama za semanticku vrijednost
+zajednickog tokena smjera; koristen obrazac iz v03 zadatak 5
+(zajednicki token) i v04 (token sa vrijednoscu).
+
+direction_statement
+  : _DIRECTION _ID
+      {
+        if(lookup_symbol($2, VAR|PAR) == NO_INDEX)
+          err("'%s' undeclared", $2);
+      }
+    _KRAJ literal _POCETAK literal
+      {
+        if(get_type($4) != get_type($6))
+          err("incompatible types in direction statement");
+        if($1 == 1 && atoi(get_name($6)) >= atoi(get_name($4)))
+          err("start literal must be less than end literal");
+        if($1 == 0 && atoi(get_name($6)) <= atoi(get_name($4)))
+          err("start literal must be greater than end literal");
+      }
+    _IZVRSI statement
+  ;
+=====================================================================
+
+KONTROLNA LISTA
+[x] Komentar sa imenom, prezimenom i indeksom je na prvoj liniji semantic.y.
+[x] _DIRECTION nosi vrijednost 1 za rasti_rasti, 0 za pada_pada.
+[x] Sve nove kljucne rijeci su iznad pravila za _ID u semantic.l.
+[x] direction_statement je ukljucen u statement.
+[x] $1=smjer, $2=id, $4=prvi literal (kraj), $6=drugi literal (pocetak).
+[x] Provjera deklaracije identifikatora je prisutna.
+[x] Tipovi oba literala se porede pomocu get_type.
+[x] rasti_rasti: drugi literal < prvi; pada_pada: drugi literal > prvi.
+[x] defs.h, symtab.c, symtab.h i Makefile nisu mijenjani.
+[ ] Pokrenuti make i make det u okruzenju sa flex i bison.
